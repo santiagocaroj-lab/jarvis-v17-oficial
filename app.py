@@ -3,9 +3,10 @@ import PyPDF2
 import re
 from fpdf import FPDF
 import pandas as pd
+import io
 
-# --- 1. CONFIGURACIÓN Y ESTILOS (SE MANTIENEN) ---
-st.set_page_config(page_title="JARVIS v18.0 - SEMILLERO", layout="wide")
+# --- 1. CONFIGURACIÓN Y ESTILOS ---
+st.set_page_config(page_title="GARZÓN - Análisis Jurisprudencial", layout="wide")
 
 st.markdown("""
     <style>
@@ -18,156 +19,213 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SISTEMA DE SEGURIDAD (SIEMPRE ACTIVO) ---
+# --- 2. SISTEMA DE SEGURIDAD (FIREWALL) ---
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 
 if not st.session_state['auth']:
-    st.markdown("<div class='main-title'>🔒 ACCESO RESTRINGIDO JARVIS</div>", unsafe_allow_html=True)
+    st.markdown("<div class='main-title'>🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     clave = st.text_input("Ingrese la clave de seguridad:", type="password")
     if st.button("INGRESAR"):
         if clave == "Juan007":
             st.session_state['auth'] = True
             st.rerun()
         else:
-            st.error("Acceso denegado.")
+            st.error("Acceso denegado. Clave incorrecta.")
     st.stop()
 
-# --- 3. MOTOR DE EXTRACCIÓN MEJORADO (v18.0) ---
+# --- 3. MOTOR DE EXTRACCIÓN JURÍDICO (NLP AVANZADO) ---
 def motor_juridico_final(pdf_file):
     texto_acumulado = ""
     try:
+        pdf_file.seek(0) # Reinicia el cursor de lectura del PDF en memoria
         reader = PyPDF2.PdfReader(pdf_file)
-        # Analizamos las primeras 5 páginas para capturar encabezado y antecedentes
-        for i in range(min(5, len(reader.pages))):
-            texto_acumulado += reader.pages[i].extract_text().upper() + " \n "
-    except:
-        return {"accionante": "ERROR", "calidad": "error", "accionado": "ERROR"}
+        # 6 páginas suelen cubrir carátula, antecedentes y hechos fácticos
+        for i in range(min(6, len(reader.pages))):
+            texto_acumulado += reader.pages[i].extract_text() + " \n "
+    except Exception as e:
+        return {"accionante": "ERROR_LECTURA", "calidad": "ERROR", "accionado": "ERROR_LECTURA"}
 
-    # --- CRITERIO ACCIONANTE (Búsqueda de nombres reales/ficticios) ---
+    # Aplanar el texto para evitar que los saltos de línea rompan las expresiones regulares
+    texto_limpio = re.sub(r'\s+', ' ', texto_acumulado)
+
+    # --- A. EXTRACCIÓN DEL ACCIONANTE ---
     accionante = "NO IDENTIFICADO"
-    # Lista de frases que NO son nombres y debemos ignorar
-    bloqueo_nombres = ["MAGISTRADO", "PONENTE", "SECRETARIA", "CORTE", "SUPRESION", "DATOS", "RESERVA", "IDENTIDAD"]
-    
     patrones_acc = [
-        r"(?:SEÑOR|CIUDADANO|ACTOR|ACCIONANTE)\s+([A-ZÁÉÍÓÚÑ]{3,25})(?=\s|[\.,])",
-        r"(?:INSTAURADA|PROMOVIDA)\s+POR\s+([A-ZÁÉÍÓÚÑ\s]{4,30})(?=\s+CONTRA|\s+EN|[\.,])"
+        r"(?:Accionante|Demandante|Actor)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,60})(?=\s*-\s*|\s+Accionado|\s+Demandado|C\.C\.|Cédula|Nit|Expediente)",
+        r"(?:instaurada|promovida|interpuesta)\s+por\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,60})\s+(?:contra|en contra de|frente a)"
     ]
     
     for p in patrones_acc:
-        m = re.search(p, texto_acumulado)
+        m = re.search(p, texto_limpio, re.IGNORECASE)
         if m:
-            cand = m.group(1).strip()
-            # Validamos que el nombre no contenga palabras prohibidas
-            if not any(b in cand for b in bloqueo_nombres) and len(cand) > 2:
+            cand = m.group(1).strip().upper()
+            # Lista negra para no capturar magistrados ni frases procesales
+            if not any(b in cand for b in ["MAGISTRAD", "SALA", "CORTE", "JUEZ", "REVISION"]):
                 accionante = cand
                 break
 
-    # --- CRITERIO ACCIONADO (Búsqueda de Entidad) ---
+    # --- B. EXTRACCIÓN DEL ACCIONADO (Con Resolución de Alias) ---
     accionado = "NO IDENTIFICADO"
-    # Patrones específicos de la Corte: "CONTRA...", "ACCIONADO:...", "DEMANDADA:..."
     patrones_ado = [
-        r"(?:CONTRA|DEMANDAD[OA]|ACCIONAD[OA])\s*[:\-]?\s*(?:LA|EL|LOS|LAS)?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,55})(?=\s+Y|\s+POR|\s+ANTE|\.|\n|QUIEN|INTERPUSO)",
-        r"(?:DIRIGIDA\s+CONTRA)\s+([A-ZÁÉÍÓÚÑ\s\.]{3,55})"
+        r"(?:Accionado|Demandado|Entidad accionada)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,80})(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente)",
+        r"(?:contra|en contra de)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,80})(?=\.|\,| para | a fin de | por presunta | solicitando| mediante)"
     ]
     
     for p in patrones_ado:
-        m = re.search(p, texto_acumulado)
+        m = re.search(p, texto_limpio, re.IGNORECASE)
         if m:
-            cand = m.group(1).strip()
-            # Si el extractor atrapó "ACTO ADMINISTRATIVO" o "SENTENCIA", seguimos buscando
-            if not any(b in cand for b in ["ACTO", "SENTENCIA", "PROVIDENCIA", "RECURSO"]) and len(cand) > 3:
+            cand = m.group(1).strip().upper()
+            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION"]):
                 accionado = cand
                 break
+    
+    # Estandarización de Alias Críticos (UNP, Fiscalía)
+    if "UNIDAD NACIONAL DE PROTECC" in accionado or re.search(r"\bUNP\b", accionado):
+        accionado = "UNIDAD NACIONAL DE PROTECCION (UNP)"
+    elif "FISCALIA" in accionado or "NACION" in accionado:
+        if "FISCAL" in accionado: accionado = "FISCALIA GENERAL DE LA NACION"
 
-    # Refuerzo para entidades del Semillero
-    entidades_fijas = ["UNIDAD NACIONAL DE PROTECCION", "UNP", "MINISTERIO DEL INTERIOR", "FISCALIA", "POLICIA"]
-    for e in entidades_fijas:
-        if e in texto_acumulado and (accionado == "NO IDENTIFICADO" or len(accionado) < 5):
-            accionado = e
+    # --- C. EXTRACCIÓN DE LA CALIDAD (Búsqueda Relacional Estricta) ---
+    calidad = "OTRA (CIVIL/ETC)"
+    profesiones = r"(periodista|comunicador|reportero|líder social|defensor de derechos|abogado|firmante de paz|indígena)"
+    
+    # 1. Búsqueda por condición explícita
+    patrones_condicion = [
+        rf"(?:calidad de|condición de|desempeña como|ejerce como|profesión|oficio de)\s+{profesiones}",
+        rf"{profesiones}\s+(?:amenazado|amenazada|de profesión|independiente|de la emisora|del canal)"
+    ]
+    
+    for p in patrones_condicion:
+        m = re.search(p, texto_limpio, re.IGNORECASE)
+        if m:
+            calidad = m.group(1).strip().upper()
             break
-
-    # --- CRITERIO CALIDAD ---
-    calidad = "civil"
-    if any(k in texto_acumulado for k in ["PERIODISTA", "LIBERTAD DE PRENSA", "COMUNICADOR", "REPORTERO"]):
-        calidad = "periodista"
+            
+    # 2. Búsqueda de proximidad (Si no funcionó la explícita)
+    if calidad == "OTRA (CIVIL/ETC)" and accionante != "NO IDENTIFICADO":
+        primer_nombre = accionante.split()[0]
+        # Busca la profesión a un máximo de 120 caracteres del primer nombre del accionante
+        patron_proximidad = rf"{re.escape(primer_nombre)}.{'{0,120}'}{profesiones}"
+        m_prox = re.search(patron_proximidad, texto_limpio, re.IGNORECASE | re.DOTALL)
+        if m_prox:
+            calidad = m_prox.group(1).strip().upper()
+            
+    # Estandarizamos sinónimos
+    if calidad in ["COMUNICADOR", "REPORTERO"]:
+        calidad = "PERIODISTA"
+    elif "LÍDER SOCIAL" in calidad or "LIDER SOCIAL" in calidad:
+        calidad = "LÍDER SOCIAL"
                 
     return {"accionante": accionante, "calidad": calidad, "accionado": accionado}
 
-# --- 4. INTERFAZ Y PROCESAMIENTO ---
-st.markdown("<div class='main-title'>JARVIS JURÍDICO v18.0</div>", unsafe_allow_html=True)
+# --- 4. INTERFAZ GRÁFICA Y CONTROL DE ESTADO ---
+st.markdown("<div class='main-title'>GARZÓN - INGENIERÍA EN REVERSA JURISPRUDENCIAL</div>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    st.subheader("⚙️ Configuración Base")
-    file_arq = st.file_uploader("Sentencia Arquimédica", type="pdf", key="arq")
-    m_calidad = st.selectbox("Calidad Manual", ["No aplica", "Periodista", "Civil"])
-    m_accionado = st.text_input("Accionado Manual")
+    st.subheader("⚙️ 1. Sentencia Arquimédica (Base)")
+    file_arq = st.file_uploader("Sube el PDF de la sentencia más reciente", type="pdf", key="arq")
+    st.info("Garzón extraerá la Entidad Accionada y la Calidad de este documento para establecer los criterios de inclusión absolutos.")
 
 with col2:
-    st.subheader("📂 Análisis Masivo")
-    files_comp = st.file_uploader("Subir archivos comparativos", type="pdf", accept_multiple_files=True, key="masivo")
+    st.subheader("📂 2. Sentencias a Filtrar")
+    files_comp = st.file_uploader("Sube las sentencias citadas (para incluir/excluir)", type="pdf", accept_multiple_files=True, key="masivo")
+
+# Inicialización del estado de sesión para retener resultados
+if 'analisis_terminado' not in st.session_state:
+    st.session_state['analisis_terminado'] = False
+    st.session_state['resultados_df'] = None
+    st.session_state['pdf_binario'] = None
+    st.session_state['html_parametros'] = ""
 
 if st.button("🚀 EJECUTAR ANÁLISIS"):
-    if not file_arq and not m_accionado:
-        st.error("Debe proporcionar una base (PDF o texto manual).")
+    if not file_arq:
+        st.error("Falta la Sentencia Arquimédica. Es obligatoria para establecer el patrón.")
     elif not files_comp:
-        st.warning("Suba sentencias para analizar.")
+        st.warning("Sube al menos un PDF en la sección de sentencias a filtrar.")
     else:
-        # Extraer parámetros de la Arquimédica
-        base = {"calidad": m_calidad.lower(), "accionado": m_accionado.upper(), "accionante": "No identificado"}
-        if file_arq:
-            ext_base = motor_juridico_final(file_arq)
-            base["accionante"] = ext_base["accionante"]
-            if m_calidad == "No aplica": base["calidad"] = ext_base["calidad"]
-            if not m_accionado: base["accionado"] = ext_base["accionado"]
-
-        st.markdown(f"""
-        <div class="param-box">
-            <b>PARÁMETROS DE LA SENTENCIA ARQUIMÉDICA:</b><br>
-            La sentencia arquimédica dio como parámetros un accionante <b>{base['accionante']}</b> (Calidad: {base['calidad']}), 
-            siendo el accionado <b>{base['accionado']}</b>.
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Generar Tabla
-        resultados = []
-        for f in files_comp:
-            info = motor_juridico_final(f)
-            fallos = []
-            if base["calidad"] != "no aplica" and info["calidad"] != base["calidad"]:
-                fallos.append(f"Calidad ({info['calidad']})")
-            if base["accionado"][:5] not in info["accionado"]:
-                fallos.append("Accionado diferente")
+        with st.spinner("Garzón está analizando las estructuras procesales..."):
             
-            estado = "✅ INCLUIDA" if not fallos else "❌ EXCLUIDA"
-            resultados.append({
-                "Archivo": f.name,
-                "Accionante / Calidad": f"{info['accionante']} / {info['calidad']}",
-                "Accionado Detectado": info["accionado"],
-                "Resultado": estado,
-                "Motivo": ", ".join(fallos) if fallos else "Coincidencia plena"
-            })
-        
-        st.table(pd.DataFrame(resultados))
+            # --- FASE 1: Extraer parámetros maestros de la Arquimédica ---
+            ext_base = motor_juridico_final(file_arq)
+            
+            st.session_state['html_parametros'] = f"""
+            <div class="param-box">
+                <b>PARÁMETROS ESTRICTOS (SENTENCIA ARQUIMÉDICA):</b><br>
+                <ul>
+                    <li><b>Calidad Exigida:</b> {ext_base['calidad']}</li>
+                    <li><b>Entidad Accionada Exigida:</b> {ext_base['accionado']}</li>
+                    <li><i>Accionante Base Registrado: {ext_base['accionante']} (No usado para excluir)</i></li>
+                </ul>
+            </div>
+            """
 
-        # --- REPORTE PDF SEGURO ---
-        def safe_pdf(txt): return txt.encode('ascii', 'ignore').decode('ascii')
-        
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, "REPORTE DE INVESTIGACION - JARVIS", 0, 1, 'C')
-        pdf.set_font("Arial", '', 10)
-        pdf.ln(5)
-        pdf.multi_cell(0, 7, safe_pdf(f"PARAMETROS BASE:\nAccionante: {base['accionante']}\nAccionado: {base['accionado']}\nCalidad: {base['calidad']}\n" + "="*50))
-        
-        for r in resultados:
-            pdf.set_fill_color(255, 193, 6) if "INCLUIDA" in r["Resultado"] else pdf.set_fill_color(240, 240, 240)
-            pdf.cell(0, 8, safe_pdf(f"Doc: {r['Archivo']}"), 1, 1, 'L', True)
-            pdf.multi_cell(0, 6, safe_pdf(f"Accionante: {r['Accionante / Calidad']}\nAccionado: {r['Accionado Detectado']}\nResultado: {r['Resultado']}\nMotivo: {r['Motivo']}\n" + "."*80))
-            pdf.ln(2)
+            # --- FASE 2: Analizar y comparar archivos masivos ---
+            resultados = []
+            
+            for f in files_comp:
+                info = motor_juridico_final(f)
+                fallos = []
+                
+                # Criterio 1: La calidad debe ser exactamente la misma
+                if info["calidad"] != ext_base["calidad"]:
+                    fallos.append(f"Calidad difiere (Es {info['calidad']})")
+                
+                # Criterio 2: El accionado debe coincidir (Búsqueda cruzada para perdonar recortes de texto)
+                # Si ninguno de los dos strings contiene al otro, entonces son diferentes.
+                if ext_base["accionado"] not in info["accionado"] and info["accionado"] not in ext_base["accionado"]:
+                    fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
+                
+                estado = "✅ INCLUIDA" if not fallos else "❌ EXCLUIDA"
+                resultados.append({
+                    "Archivo": f.name,
+                    "Accionante Encontrado": info['accionante'],
+                    "Calidad Detectada": info['calidad'],
+                    "Accionado Detectado": info["accionado"],
+                    "Veredicto": estado,
+                    "Motivo": ", ".join(fallos) if fallos else "Cumple ambos criterios"
+                })
+            
+            st.session_state['resultados_df'] = pd.DataFrame(resultados)
 
-        pdf_bin = pdf.output(dest='S').encode('latin-1')
-        st.download_button("📥 DESCARGAR REPORTE FINAL", data=pdf_bin, file_name="analisis_jarvis.pdf")
+            # --- FASE 3: Generación del Reporte PDF ---
+            def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA - GARZON", 0, 1, 'C')
+            pdf.set_font("Arial", '', 10)
+            pdf.ln(5)
+            pdf.multi_cell(0, 7, safe_pdf(f"PARAMETROS DE EXCLUSION:\nCalidad Exigida: {ext_base['calidad']}\nAccionado Exigido: {ext_base['accionado']}\n" + "="*50))
+            
+            for r in resultados:
+                if "INCLUIDA" in r["Veredicto"]:
+                    pdf.set_fill_color(220, 255, 220) # Verde
+                else:
+                    pdf.set_fill_color(255, 220, 220) # Rojo
+                pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
+                pdf.multi_cell(0, 6, safe_pdf(f"Accionante: {r['Accionante Encontrado']}\nCalidad: {r['Calidad Detectada']}\nAccionado: {r['Accionado Detectado']}\nVEREDICTO: {r['Veredicto']}\nRazon: {r['Motivo']}\n" + "-"*80))
+                pdf.ln(2)
+
+            try:
+                st.session_state['pdf_binario'] = pdf.output(dest='S').encode('latin-1')
+            except AttributeError:
+                st.session_state['pdf_binario'] = bytes(pdf.output())
+
+            # Guardamos el estado exitoso
+            st.session_state['analisis_terminado'] = True
+
+
+# --- 5. VISUALIZACIÓN DE RESULTADOS FUERA DEL BOTÓN ---
+if st.session_state['analisis_terminado']:
+    st.markdown(st.session_state['html_parametros'], unsafe_allow_html=True)
+    st.table(st.session_state['resultados_df'])
+    
+    st.download_button(
+        label="📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
+        data=st.session_state['pdf_binario'], 
+        file_name="reporte_linea_jurisprudencial.pdf",
+        mime="application/pdf"
+    )
