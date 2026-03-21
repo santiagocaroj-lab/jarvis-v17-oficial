@@ -4,6 +4,8 @@ import re
 from fpdf import FPDF
 import pandas as pd
 import io
+import base64
+import os
 
 # --- 1. CONFIGURACIÓN Y ESTILOS VISUALES ---
 st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide")
@@ -17,14 +19,14 @@ st.markdown("""
     /* --- ESTILOS DE LA PÁGINA DE BIENVENIDA --- */
     .welcome-wrapper {
         background: linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 100%);
-        padding: 100px 20px;
+        padding: 80px 20px;
         border-radius: 20px;
         text-align: center;
         box-shadow: 0px 10px 30px rgba(0,0,0,0.2);
         margin-top: 5vh;
         margin-bottom: 40px;
     }
-    .welcome-title { font-size: 60px; font-weight: 700; color: #ffffff !important; margin-bottom: 10px; }
+    .welcome-title { font-size: 55px; font-weight: 700; color: #ffffff !important; margin-bottom: 10px; margin-top: 20px; }
     .welcome-subtitle { font-size: 24px; color: #f0f0f0 !important; font-style: italic; margin-bottom: 40px; }
     .question-title { font-size: 30px; font-weight: bold; color: #ffffff !important; margin-bottom: 30px; }
     
@@ -51,15 +53,30 @@ if 'pagina_actual' not in st.session_state:
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 if 'uploader_key' not in st.session_state:
-    st.session_state['uploader_key'] = 0 # Clave dinámica para borrar archivos subidos
+    st.session_state['uploader_key'] = 0 
 
 # =====================================================================
 # PANTALLA 1: BIENVENIDA (ECOMODA)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'bienvenida':
-    # Agrupamos los textos en el contenedor oscuro centrado
-    st.markdown("""
+    
+    # Lógica para leer la imagen local y convertirla a Base64 para incrustarla en el HTML
+    nombre_imagen = "Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png"
+    img_html = ""
+    
+    if os.path.exists(nombre_imagen):
+        with open(nombre_imagen, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        # Incrustamos la imagen centrada, con bordes redondeados y una sombra dorada
+        img_html = f"<img src='data:image/png;base64,{encoded_string}' width='250' style='border-radius: 15px; box-shadow: 0px 8px 15px rgba(255,193,6,0.3);'>"
+    else:
+        # Mensaje de error discreto por si la imagen no se encuentra en la ruta
+        img_html = f"<p style='color: #ff4444; font-size: 14px;'>[No se encontró la imagen: {nombre_imagen}. Verifica que esté en la misma carpeta]</p>"
+
+    # Agrupamos la imagen y los textos en el contenedor oscuro centrado
+    st.markdown(f"""
         <div class='welcome-wrapper'>
+            {img_html}
             <div class='welcome-title'>Bienvenido a ECOMODA</div>
             <div class='welcome-subtitle'>Tu servidor jurídico predilecto</div>
             <div class='question-title'>¿Qué haremos hoy?</div>
@@ -205,7 +222,6 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
         st.session_state['pdf_binario'] = None
         st.session_state['html_parametros'] = ""
 
-    # Botones de Acción (Ejecutar y Limpiar)
     col_btn1, col_btn2 = st.columns(2)
     
     with col_btn2:
@@ -214,7 +230,7 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
             st.session_state['resultados_df'] = None
             st.session_state['pdf_binario'] = None
             st.session_state['html_parametros'] = ""
-            st.session_state['uploader_key'] += 1 # Cambiar la key borra los archivos subidos
+            st.session_state['uploader_key'] += 1 
             st.rerun()
 
     with col_btn1:
