@@ -16,6 +16,12 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Montserrat', sans-serif; background-color: white; color: #1a1a1a; }
     .main-title { font-size: 38px; font-weight: 800; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; text-transform: uppercase; }
     
+    /* --- ANIMACIONES CSS (FADE IN) --- */
+    @keyframes fadeInUp {
+        0% { opacity: 0; transform: translateY(40px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
     /* --- ESTILOS INSPIRADOS EN EL MOCKUP (PÁGINA DE BIENVENIDA) --- */
     .welcome-wrapper {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); /* Azul/Gris oscuro muy elegante */
@@ -26,6 +32,9 @@ st.markdown("""
         margin-top: 4vh;
         margin-bottom: 40px;
         border: 1px solid #334155;
+        
+        /* Aplicamos la animación aquí */
+        animation: fadeInUp 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     .ecomoda-header { 
         font-size: 16px; 
@@ -56,8 +65,18 @@ st.markdown("""
     }
     
     /* --- ESTILOS GENERALES Y BOTONES --- */
-    .stButton>button { background-color: #ffc106; color: black; border: 2px solid black; font-weight: bold; width: 100%; height: 50px; text-transform: uppercase; letter-spacing: 1px; }
-    .stButton>button:hover { background-color: black; color: #ffc106; }
+    .stButton>button { 
+        background-color: #ffc106; 
+        color: black; 
+        border: 2px solid black; 
+        font-weight: bold; 
+        width: 100%; 
+        height: 50px; 
+        text-transform: uppercase; 
+        letter-spacing: 1px; 
+        transition: all 0.3s ease; /* Transición suave para el hover del botón */
+    }
+    .stButton>button:hover { background-color: black; color: #ffc106; transform: scale(1.02); }
     .param-box { 
         background-color: #f8f9fa; 
         border: 2px solid #ffc106; 
@@ -81,7 +100,7 @@ if 'uploader_key' not in st.session_state:
     st.session_state['uploader_key'] = 0 
 
 # =====================================================================
-# PANTALLA 1: BIENVENIDA (ESTILO MOCKUP)
+# PANTALLA 1: BIENVENIDA (ESTILO MOCKUP CON ANIMACIÓN)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'bienvenida':
     
@@ -92,12 +111,11 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     if os.path.exists(nombre_imagen):
         with open(nombre_imagen, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
-        # Imagen un poco más compacta para encajar con el estilo serio
         img_html = f"<img src='data:image/png;base64,{encoded_string}' width='140' style='border-radius: 10px;'>"
     else:
         img_html = f"<p style='color: #ef4444; font-size: 12px;'>[Falta logo: {nombre_imagen}]</p>"
 
-    # Estructura HTML calcada de tu diseño
+    # Estructura HTML calcada de tu diseño, la animación se activa gracias a la clase 'welcome-wrapper'
     st.markdown(f"""
         <div class='welcome-wrapper'>
             {img_html}
