@@ -24,7 +24,7 @@ st.markdown("""
 
     /* --- ESTILOS INSPIRADOS EN EL MOCKUP (PÁGINA DE BIENVENIDA) --- */
     .welcome-wrapper {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); /* Azul/Gris oscuro muy elegante */
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
         padding: 60px 40px;
         border-radius: 16px;
         text-align: center;
@@ -32,8 +32,6 @@ st.markdown("""
         margin-top: 4vh;
         margin-bottom: 40px;
         border: 1px solid #334155;
-        
-        /* Aplicamos la animación aquí */
         animation: fadeInUp 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
     }
     .ecomoda-header { 
@@ -48,7 +46,7 @@ st.markdown("""
     .welcome-title { 
         font-size: 46px; 
         font-weight: 800; 
-        color: #ffc106 !important; /* Dorado/Amarillo */
+        color: #ffc106 !important; 
         margin-bottom: 20px; 
         line-height: 1.2;
         text-transform: uppercase;
@@ -74,9 +72,38 @@ st.markdown("""
         height: 50px; 
         text-transform: uppercase; 
         letter-spacing: 1px; 
-        transition: all 0.3s ease; /* Transición suave para el hover del botón */
+        transition: all 0.3s ease; 
+        border-radius: 8px;
     }
     .stButton>button:hover { background-color: black; color: #ffc106; transform: scale(1.02); }
+    
+    /* --- ESTILO PARA EL NUEVO BOTÓN DE GUÍA (GHOST BUTTON) --- */
+    .guide-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent;
+        color: #ffc106;
+        border: 2px solid #ffc106;
+        font-weight: bold;
+        width: 100%;
+        height: auto;
+        padding: 12px 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        border-radius: 8px;
+        text-decoration: none;
+        margin-top: 15px;
+        font-size: 13px;
+    }
+    .guide-button:hover {
+        background-color: #ffc106;
+        color: black;
+        transform: scale(1.02);
+        text-decoration: none;
+    }
+
     .param-box { 
         background-color: #f8f9fa; 
         border: 2px solid #ffc106; 
@@ -100,11 +127,10 @@ if 'uploader_key' not in st.session_state:
     st.session_state['uploader_key'] = 0 
 
 # =====================================================================
-# PANTALLA 1: BIENVENIDA (ESTILO MOCKUP CON ANIMACIÓN)
+# PANTALLA 1: BIENVENIDA (ESTILO MOCKUP CON ANIMACIÓN Y GUÍA)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'bienvenida':
     
-    # Lógica para leer la imagen local (Logo)
     nombre_imagen = "Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png"
     img_html = ""
     
@@ -115,7 +141,6 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     else:
         img_html = f"<p style='color: #ef4444; font-size: 12px;'>[Falta logo: {nombre_imagen}]</p>"
 
-    # Estructura HTML calcada de tu diseño, la animación se activa gracias a la clase 'welcome-wrapper'
     st.markdown(f"""
         <div class='welcome-wrapper'>
             {img_html}
@@ -129,9 +154,18 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
+        # 1. Botón Principal de Ingreso
         if st.button("🚀 INGRESAR AL SISTEMA"):
             st.session_state['pagina_actual'] = 'login'
             st.rerun()
+        
+        # 2. Botón Secundario (Guía) enlazado a ResearchGate
+        st.markdown("""
+            <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
+                📖 ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
+            </a>
+        """, unsafe_allow_html=True)
+            
     st.stop()
 
 # =====================================================================
