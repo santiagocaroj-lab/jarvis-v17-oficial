@@ -12,26 +12,51 @@ st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Montserrat', sans-serif; background-color: white; color: #1a1a1a; }
-    .main-title { font-size: 38px; font-weight: 700; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; }
+    .main-title { font-size: 38px; font-weight: 800; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; text-transform: uppercase; }
     
-    /* --- ESTILOS DE LA PÁGINA DE BIENVENIDA --- */
+    /* --- ESTILOS INSPIRADOS EN EL MOCKUP (PÁGINA DE BIENVENIDA) --- */
     .welcome-wrapper {
-        background: linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 100%);
-        padding: 80px 20px;
-        border-radius: 20px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); /* Azul/Gris oscuro muy elegante */
+        padding: 60px 40px;
+        border-radius: 16px;
         text-align: center;
-        box-shadow: 0px 10px 30px rgba(0,0,0,0.2);
-        margin-top: 5vh;
+        box-shadow: 0px 15px 35px rgba(0,0,0,0.4);
+        margin-top: 4vh;
         margin-bottom: 40px;
+        border: 1px solid #334155;
     }
-    .welcome-title { font-size: 55px; font-weight: 700; color: #ffffff !important; margin-bottom: 10px; margin-top: 20px; }
-    .welcome-subtitle { font-size: 24px; color: #f0f0f0 !important; font-style: italic; margin-bottom: 40px; }
-    .question-title { font-size: 30px; font-weight: bold; color: #ffffff !important; margin-bottom: 30px; }
+    .ecomoda-header { 
+        font-size: 16px; 
+        color: #94a3b8; 
+        letter-spacing: 5px; 
+        font-weight: 600; 
+        margin-top: 15px;
+        margin-bottom: 25px; 
+        text-transform: uppercase;
+    }
+    .welcome-title { 
+        font-size: 46px; 
+        font-weight: 800; 
+        color: #ffc106 !important; /* Dorado/Amarillo */
+        margin-bottom: 20px; 
+        line-height: 1.2;
+        text-transform: uppercase;
+    }
+    .welcome-subtitle { 
+        font-size: 18px; 
+        color: #f8fafc !important; 
+        font-weight: 400;
+        margin-bottom: 40px; 
+        max-width: 700px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+    }
     
     /* --- ESTILOS GENERALES Y BOTONES --- */
-    .stButton>button { background-color: #ffc106; color: black; border: 2px solid black; font-weight: bold; width: 100%; height: 50px; }
+    .stButton>button { background-color: #ffc106; color: black; border: 2px solid black; font-weight: bold; width: 100%; height: 50px; text-transform: uppercase; letter-spacing: 1px; }
     .stButton>button:hover { background-color: black; color: #ffc106; }
     .param-box { 
         background-color: #f8f9fa; 
@@ -56,36 +81,37 @@ if 'uploader_key' not in st.session_state:
     st.session_state['uploader_key'] = 0 
 
 # =====================================================================
-# PANTALLA 1: BIENVENIDA (ECOMODA)
+# PANTALLA 1: BIENVENIDA (ESTILO MOCKUP)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'bienvenida':
     
-    # Lógica para leer la imagen local y convertirla a Base64 para incrustarla en el HTML
+    # Lógica para leer la imagen local (Logo)
     nombre_imagen = "Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png"
     img_html = ""
     
     if os.path.exists(nombre_imagen):
         with open(nombre_imagen, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
-        # Incrustamos la imagen centrada, con bordes redondeados y una sombra dorada
-        img_html = f"<img src='data:image/png;base64,{encoded_string}' width='250' style='border-radius: 15px; box-shadow: 0px 8px 15px rgba(255,193,6,0.3);'>"
+        # Imagen un poco más compacta para encajar con el estilo serio
+        img_html = f"<img src='data:image/png;base64,{encoded_string}' width='140' style='border-radius: 10px;'>"
     else:
-        # Mensaje de error discreto por si la imagen no se encuentra en la ruta
-        img_html = f"<p style='color: #ff4444; font-size: 14px;'>[No se encontró la imagen: {nombre_imagen}. Verifica que esté en la misma carpeta]</p>"
+        img_html = f"<p style='color: #ef4444; font-size: 12px;'>[Falta logo: {nombre_imagen}]</p>"
 
-    # Agrupamos la imagen y los textos en el contenedor oscuro centrado
+    # Estructura HTML calcada de tu diseño
     st.markdown(f"""
         <div class='welcome-wrapper'>
             {img_html}
-            <div class='welcome-title'>Bienvenido a ECOMODA</div>
-            <div class='welcome-subtitle'>Tu servidor jurídico predilecto</div>
-            <div class='question-title'>¿Qué haremos hoy?</div>
+            <div class='ecomoda-header'>Ecomoda - Servidor Jurídico</div>
+            <div class='welcome-title'>Análisis Jurisprudencial para Periodistas</div>
+            <div class='welcome-subtitle'>
+                Descubre las líneas jurisprudenciales clave de la Corte Constitucional mediante nuestro motor de inteligencia artificial <b>'Garzón'</b>.
+            </div>
         </div>
     """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🚀 Ir a 'Garzón'"):
+        if st.button("🚀 INGRESAR AL SISTEMA"):
             st.session_state['pagina_actual'] = 'login'
             st.rerun()
     st.stop()
