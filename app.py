@@ -116,4 +116,4 @@ if st.button("🚀 EJECUTAR ANÁLISIS"):
         st.warning("Suba sentencias para analizar.")
     else:
         # Extraer parámetros de la Arquimédica
-        base = {"calidad": m
+        base = {"calidad": m_calidad.lower(), "accionado": m_accionado.upper(), "accionante": "No identificado"}
