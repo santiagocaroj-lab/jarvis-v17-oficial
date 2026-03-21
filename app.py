@@ -5,7 +5,7 @@ from fpdf import FPDF
 import pandas as pd
 
 # --- CONFIGURACIÓN Y ESTILOS ---
-st.set_page_config(page_title="JARVIS v17.3 - PRO", layout="wide")
+st.set_page_config(page_title="JARVIS v17.4 - PRO", layout="wide")
 
 st.markdown("""
     <style>
@@ -34,6 +34,13 @@ st.markdown("""
         background-color: black; 
         color: #ffc106; 
     }
+    .param-box {
+        background-color: #f9f9f9;
+        border: 1px solid #ffc106;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,7 +59,7 @@ if not st.session_state['autenticado']:
             st.error("¿Eres un espía ruso intentando robar el código? Pues te salió mal: la clave es incorrecta.")
     st.stop()
 
-# --- FUNCIONES TÉCNICAS REFORZADAS ---
+# --- FUNCIONES DE EXTRACCIÓN MEJORADAS ---
 def limpiar_para_pdf(texto):
     if not texto: return ""
     reemplazos = {'á':'a','é':'e','í':'i','ó':'o','ú':'u','Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','ñ':'n','Ñ':'N'}
@@ -60,36 +67,49 @@ def limpiar_para_pdf(texto):
         texto = texto.replace(orig, new)
     return texto.encode('ascii', 'ignore').decode('ascii')
 
-def analizar_texto_avanzado(texto):
+def analizar_entidades(texto):
     t = texto.upper()
-    # Identificación de Calidad
-    calidad = "civil"
-    if any(k in t for k in ["PERIODISTA", "PRENSA", "RADIO", "COMUNICADOR", "REPORTERO", "NOTICIERO"]):
-        calidad = "periodista"
     
-    # Identificación de Accionado (Multi-Patrón)
-    accionado = "NO IDENTIFICADO"
-    patrones = [
-        r"(?:ACCIONADO|CONTRA|DEMANDADO|DIRIGIDA CONTRA|EN CONTRA DE)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,70})(?=\s|INSTAURÓ|ANTE|POR|DERECHOS)",
-        r"(?:SENTENCIA\s+DE\s+TUTELA\s+DE\s+.*?\s+CONTRA\s+)([A-ZÁÉÍÓÚÑ\s\.]{3,70})",
-        r"(?:NOTIFÍQUESE\s+A\s+)([A-ZÁÉÍÓÚÑ\s\.]{3,70})",
-        r"(?:DEMANDADA\s*:\s*)([A-ZÁÉÍÓÚÑ\s\.]{3,70})"
+    # 1. Identificar Accionante (Nombre)
+    accionante = "NO IDENTIFICADO"
+    patrones_te = [
+        r"(?:ACCIONANTE|DEMANDANTE|PROMOVIDA POR|INTERPUESTA POR|CIUDADANO|SEÑOR\(A\))\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,50})(?=\s|CONTRA|INSTAURÓ|PRESENTÓ)",
+        r"(?:AUTOR\s*:\s*)([A-ZÁÉÍÓÚÑ\s\.]{3,50})"
     ]
+    for p in patrones_te:
+        m = re.search(p, t)
+        if m: 
+            accionante = m.group(1).strip()
+            break
+
+    # 2. Identificar Calidad
+    calidad = "no aplica"
+    palabras_periodista = ["PERIODISTA", "PRENSA", "RADIO", "COMUNICADOR", "REPORTERO", "NOTICIERO", "MEDIO DE COMUNICACION"]
+    if any(k in t for k in palabras_periodista):
+        calidad = "periodista"
+    elif "CIUDADANO" in t or "CIVIL" in t:
+        calidad = "civil"
     
-    for p in patrones:
-        match = re.search(p, t)
-        if match:
-            posible = match.group(1).strip()
-            # Limpieza de conectores finales
-            posible = re.split(r'\s(Y|PARA|QUE|EL|LA|EN)\s', posible)[0]
+    # 3. Identificar Accionado (Entidad)
+    accionado = "NO IDENTIFICADO"
+    patrones_to = [
+        r"(?:ACCIONADO|CONTRA|DEMANDADO|DIRIGIDA CONTRA|EN CONTRA DE)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,60})(?=\s|INSTAURÓ|ANTE|POR|DERECHOS|RESUELVE)",
+        r"(?:CONTRA LA|CONTRA EL)\s+([A-ZÁÉÍÓÚÑ\s\.]{3,60})",
+        r"(?:NOTIFÍQUESE A)\s+([A-ZÁÉÍÓÚÑ\s\.]{3,60})"
+    ]
+    for p in patrones_to:
+        m = re.search(p, t)
+        if m:
+            posible = m.group(1).strip()
+            posible = re.split(r'\s(Y|PARA|QUE|EL|LA|EN|CON)\s', posible)[0]
             if len(posible) > 3:
                 accionado = posible
                 break
                 
-    return {"calidad": calidad, "accionado": accionado}
+    return {"accionante": accionante, "calidad": calidad, "accionado": accionado}
 
 # --- INTERFAZ ---
-st.markdown("<div class='main-title'>JARVIS JURÍDICO v17.3</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>JARVIS JURÍDICO v17.4</div>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2, gap="large")
 
@@ -98,7 +118,7 @@ with col1:
     file_arq = st.file_uploader("1. Cargar Sentencia Arquimédica", type="pdf")
     st.write("---")
     st.write("✍️ **Entrada Manual (Facultativo)**")
-    m_calidad = st.selectbox("Calidad del accionante", ["Periodista", "Civil"])
+    m_calidad = st.selectbox("Calidad del accionante", ["No aplica", "Periodista", "Civil"])
     m_accionado = st.text_input("Entidad accionada (Ej: UNP, Fiscalía, etc.)")
 
 with col2:
@@ -111,73 +131,70 @@ if st.button("🚀 EJECUTAR ANÁLISIS COMPARATIVO"):
     elif not files_comp:
         st.warning("Por favor, suba al menos una sentencia para analizar.")
     else:
-        # 1. Procesar la Arquimédica
-        base = {"calidad": m_calidad.lower(), "accionado": m_accionado.upper()}
-        nombre_arq = "Manual"
+        # Procesar Arquimédica para definir Base
+        base = {"calidad": m_calidad.lower(), "accionado": m_accionado.upper(), "accionante": "No definido"}
         
         if file_arq:
-            nombre_arq = file_arq.name
             t_base = PyPDF2.PdfReader(file_arq).pages[0].extract_text()
-            extraido_base = analizar_texto_avanzado(t_base)
-            if not m_accionado: base["accionado"] = extraido_base["accionado"]
-            # Si el usuario no tocó el selector, usamos lo que diga el PDF
-            if m_calidad == "Civil": base["calidad"] = extraido_base["calidad"]
+            ext_base = analizar_entidades(t_base)
+            base["accionante"] = ext_base["accionante"]
+            if not m_accionado: base["accionado"] = ext_base["accionado"]
+            if m_calidad == "No aplica": base["calidad"] = ext_base["calidad"]
 
-        # 2. Iniciar lista de resultados con la Arquimédica como referencia
-        resultados_tabla = [{
-            "Sentencia": f"⭐ {nombre_arq}",
-            "Accionado": base["accionado"],
-            "Calidad": base["calidad"],
-            "Resultado": "PARÁMETROS",
-            "Motivo": "Sentencia Base"
-        }]
+        # Mensaje de Parámetros
+        st.markdown(f"""
+        <div class="param-box">
+            <b>RESULTADO DE PARÁMETROS:</b><br>
+            La sentencia arquimédica dio como parámetros un accionante <b>{base['accionante']}</b> (Calidad: {base['calidad']}), 
+            siendo el accionado <b>{base['accionado']}</b>.
+        </div>
+        """, unsafe_allow_html=True)
 
-        # 3. Procesar Comparativas
+        # Procesar Comparativas
+        resultados_tabla = []
         for f in files_comp:
             try:
                 t_f = PyPDF2.PdfReader(f).pages[0].extract_text()
-                info_f = analizar_texto_avanzado(t_f)
+                info_f = analizar_entidades(t_f)
                 
                 razones = []
-                if info_f["calidad"] != base["calidad"]: 
-                    razones.append(f"Calidad: {info_f['calidad']}")
+                # Solo comparamos calidad si no es "no aplica"
+                if base["calidad"] != "no aplica" and info_f["calidad"] != base["calidad"]: 
+                    razones.append(f"Calidad distinta ({info_f['calidad']})")
                 
-                # Comparación de accionado (Sustancial: primeras 6 letras)
+                # Comparación de accionado (Sustancial)
                 if base["accionado"][:6] not in info_f["accionado"]: 
-                    razones.append("Accionado diferente")
+                    razones.append("Entidad no coincide")
                 
                 es_ok = len(razones) == 0
                 resultados_tabla.append({
                     "Sentencia": f.name,
+                    "Accionante (Nombre/Calidad)": f"{info_f['accionante']} / {info_f['calidad']}",
                     "Accionado": info_f["accionado"],
-                    "Calidad": info_f["calidad"],
                     "Resultado": "✅ INCLUIDA" if es_ok else "❌ EXCLUIDA",
-                    "Motivo": ", ".join(razones) if razones else "Coincidencia"
+                    "Motivo": ", ".join(razones) if razones else "Cumple criterios"
                 })
             except:
-                resultados_tabla.append({"Sentencia": f.name, "Resultado": "ERROR", "Motivo": "Archivo ilegible"})
+                resultados_tabla.append({"Sentencia": f.name, "Accionante (Nombre/Calidad)": "N/A", "Accionado": "ERROR", "Resultado": "ERROR", "Motivo": "Ilegible"})
 
-        # --- MOSTRAR TABLA ---
-        st.markdown("---")
-        st.markdown("### 📊 TABLA DE ANÁLISIS COMPARATIVO")
+        # Mostrar Tabla
+        st.markdown("### 📊 TABLA DE ANÁLISIS")
         st.table(pd.DataFrame(resultados_tabla))
 
-        # --- GENERACIÓN DE PDF SEGURO ---
+        # PDF Reporte
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, "REPORTE DE INVESTIGACION - JARVIS", 0, 1, 'C')
+        pdf.cell(0, 10, "REPORTE DE ANALISIS JURIDICO - JARVIS", 0, 1, 'C')
+        pdf.set_font("Arial", '', 10)
         pdf.ln(5)
+        pdf.multi_cell(0, 7, limpiar_para_pdf(f"PARAMETROS BASE:\nAccionante: {base['accionante']}\nAccionado: {base['accionado']}\nCalidad: {base['calidad']}\n" + "="*50))
         
         for r in resultados_tabla:
             pdf.set_fill_color(255, 193, 6) if "INCLUIDA" in r["Resultado"] else pdf.set_fill_color(240, 240, 240)
-            if r["Resultado"] == "PARÁMETROS": pdf.set_fill_color(200, 200, 255)
-            
-            pdf.set_font("Arial", 'B', 10)
-            pdf.cell(0, 8, limpiar_para_pdf(f"Documento: {r['Sentencia']}"), 1, 1, 'L', True)
-            pdf.set_font("Arial", '', 9)
-            pdf.multi_cell(0, 6, limpiar_para_pdf(f"Estado: {r['Resultado']}\nAccionado: {r['Accionado']}\nCalidad: {r['Calidad']}\nMotivo: {r['Motivo']}\n" + "-"*80))
+            pdf.cell(0, 8, limpiar_para_pdf(f"Doc: {r['Sentencia']}"), 1, 1, 'L', True)
+            pdf.multi_cell(0, 6, limpiar_para_pdf(f"Accionante: {r['Accionante (Nombre/Calidad)']}\nAccionado: {r['Accionado']}\nResultado: {r['Resultado']}\nMotivo: {r['Motivo']}\n" + "."*80))
             pdf.ln(2)
 
         pdf_output = pdf.output(dest='S').encode('latin-1')
-        st.download_button(label="📥 DESCARGAR REPORTE FORMAL (PDF)", data=pdf_output, file_name="analisis_jarvis.pdf", mime="application/pdf")
+        st.download_button(label="📥 DESCARGAR REPORTE PDF", data=pdf_output, file_name="analisis_jarvis.pdf", mime="application/pdf")
