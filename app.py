@@ -13,9 +13,22 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
     html, body, [class*="css"] { font-family: 'Montserrat', sans-serif; background-color: white; color: #1a1a1a; }
     .main-title { font-size: 38px; font-weight: 700; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; }
-    .welcome-title { font-size: 60px; font-weight: 700; text-align: center; margin-top: 10vh; color: #1a1a1a; }
-    .welcome-subtitle { font-size: 24px; text-align: center; margin-bottom: 40px; color: #555; font-style: italic; }
-    .question-title { font-size: 30px; text-align: center; margin-bottom: 30px; font-weight: bold; }
+    
+    /* --- ESTILOS DE LA PÁGINA DE BIENVENIDA --- */
+    .welcome-wrapper {
+        background: linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 100%);
+        padding: 100px 20px;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0px 10px 30px rgba(0,0,0,0.2);
+        margin-top: 5vh;
+        margin-bottom: 40px;
+    }
+    .welcome-title { font-size: 60px; font-weight: 700; color: #ffffff !important; margin-bottom: 10px; }
+    .welcome-subtitle { font-size: 24px; color: #f0f0f0 !important; font-style: italic; margin-bottom: 40px; }
+    .question-title { font-size: 30px; font-weight: bold; color: #ffffff !important; margin-bottom: 30px; }
+    
+    /* --- ESTILOS GENERALES Y BOTONES --- */
     .stButton>button { background-color: #ffc106; color: black; border: 2px solid black; font-weight: bold; width: 100%; height: 50px; }
     .stButton>button:hover { background-color: black; color: #ffc106; }
     .param-box { 
@@ -44,9 +57,14 @@ if 'uploader_key' not in st.session_state:
 # PANTALLA 1: BIENVENIDA (ECOMODA)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'bienvenida':
-    st.markdown("<div class='welcome-title'>Bienvenido a ECOMODA</div>", unsafe_allow_html=True)
-    st.markdown("<div class='welcome-subtitle'>Tu servidor jurídico predilecto</div>", unsafe_allow_html=True)
-    st.markdown("<div class='question-title'>¿Qué haremos hoy?</div>", unsafe_allow_html=True)
+    # Agrupamos los textos en el contenedor oscuro centrado
+    st.markdown("""
+        <div class='welcome-wrapper'>
+            <div class='welcome-title'>Bienvenido a ECOMODA</div>
+            <div class='welcome-subtitle'>Tu servidor jurídico predilecto</div>
+            <div class='question-title'>¿Qué haremos hoy?</div>
+        </div>
+    """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -174,7 +192,6 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
 
     with col1:
         st.subheader("⚙️ 1. Sentencia Arquimédica (Base)")
-        # Se añade 'uploader_key' para forzar su limpieza cuando se reinicie
         file_arq = st.file_uploader("Sube el PDF de la sentencia más reciente", type="pdf", key=f"arq_{st.session_state['uploader_key']}")
         st.info("Garzón leerá este documento para deducir orgánicamente la 'Entidad Accionada' y la 'Calidad' que servirán de regla estricta.")
 
