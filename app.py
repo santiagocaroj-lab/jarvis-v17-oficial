@@ -4,7 +4,7 @@ import re
 from fpdf import FPDF
 import pandas as pd
 
-# --- 1. CONFIGURACIÓN Y ESTILOS ---
+# --- 1. CONFIGURACIÓN Y ESTILOS (SE MANTIENEN) ---
 st.set_page_config(page_title="JARVIS v18.0 - SEMILLERO", layout="wide")
 
 st.markdown("""
@@ -18,7 +18,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SISTEMA DE SEGURIDAD ---
+# --- 2. SISTEMA DE SEGURIDAD (SIEMPRE ACTIVO) ---
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 
@@ -41,7 +41,7 @@ def motor_juridico_final(pdf_file):
         # Analizamos las primeras 5 páginas para capturar encabezado y antecedentes
         for i in range(min(5, len(reader.pages))):
             texto_acumulado += reader.pages[i].extract_text().upper() + " \n "
-    except Exception as e:
+    except:
         return {"accionante": "ERROR", "calidad": "error", "accionado": "ERROR"}
 
     # --- CRITERIO ACCIONANTE (Búsqueda de nombres reales/ficticios) ---
@@ -117,3 +117,57 @@ if st.button("🚀 EJECUTAR ANÁLISIS"):
     else:
         # Extraer parámetros de la Arquimédica
         base = {"calidad": m_calidad.lower(), "accionado": m_accionado.upper(), "accionante": "No identificado"}
+        if file_arq:
+            ext_base = motor_juridico_final(file_arq)
+            base["accionante"] = ext_base["accionante"]
+            if m_calidad == "No aplica": base["calidad"] = ext_base["calidad"]
+            if not m_accionado: base["accionado"] = ext_base["accionado"]
+
+        st.markdown(f"""
+        <div class="param-box">
+            <b>PARÁMETROS DE LA SENTENCIA ARQUIMÉDICA:</b><br>
+            La sentencia arquimédica dio como parámetros un accionante <b>{base['accionante']}</b> (Calidad: {base['calidad']}), 
+            siendo el accionado <b>{base['accionado']}</b>.
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Generar Tabla
+        resultados = []
+        for f in files_comp:
+            info = motor_juridico_final(f)
+            fallos = []
+            if base["calidad"] != "no aplica" and info["calidad"] != base["calidad"]:
+                fallos.append(f"Calidad ({info['calidad']})")
+            if base["accionado"][:5] not in info["accionado"]:
+                fallos.append("Accionado diferente")
+            
+            estado = "✅ INCLUIDA" if not fallos else "❌ EXCLUIDA"
+            resultados.append({
+                "Archivo": f.name,
+                "Accionante / Calidad": f"{info['accionante']} / {info['calidad']}",
+                "Accionado Detectado": info["accionado"],
+                "Resultado": estado,
+                "Motivo": ", ".join(fallos) if fallos else "Coincidencia plena"
+            })
+        
+        st.table(pd.DataFrame(resultados))
+
+        # --- REPORTE PDF SEGURO ---
+        def safe_pdf(txt): return txt.encode('ascii', 'ignore').decode('ascii')
+        
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, "REPORTE DE INVESTIGACION - JARVIS", 0, 1, 'C')
+        pdf.set_font("Arial", '', 10)
+        pdf.ln(5)
+        pdf.multi_cell(0, 7, safe_pdf(f"PARAMETROS BASE:\nAccionante: {base['accionante']}\nAccionado: {base['accionado']}\nCalidad: {base['calidad']}\n" + "="*50))
+        
+        for r in resultados:
+            pdf.set_fill_color(255, 193, 6) if "INCLUIDA" in r["Resultado"] else pdf.set_fill_color(240, 240, 240)
+            pdf.cell(0, 8, safe_pdf(f"Doc: {r['Archivo']}"), 1, 1, 'L', True)
+            pdf.multi_cell(0, 6, safe_pdf(f"Accionante: {r['Accionante / Calidad']}\nAccionado: {r['Accionado Detectado']}\nResultado: {r['Resultado']}\nMotivo: {r['Motivo']}\n" + "."*80))
+            pdf.ln(2)
+
+        pdf_bin = pdf.output(dest='S').encode('latin-1')
+        st.download_button("📥 DESCARGAR REPORTE FINAL", data=pdf_bin, file_name="analisis_jarvis.pdf")
