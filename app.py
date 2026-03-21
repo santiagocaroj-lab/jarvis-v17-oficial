@@ -34,14 +34,14 @@ if not st.session_state['auth']:
             st.error("Acceso denegado. Clave incorrecta.")
     st.stop()
 
-# --- 3. MOTOR DE EXTRACCIÓN JURÍDICO (NLP AVANZADO) ---
+# --- 3. MOTOR DE EXTRACCIÓN JURÍDICO (NLP AVANZADO MEJORADO) ---
 def motor_juridico_final(pdf_file):
     texto_acumulado = ""
     try:
         pdf_file.seek(0) # Reinicia el cursor de lectura del PDF en memoria
         reader = PyPDF2.PdfReader(pdf_file)
-        # 6 páginas suelen cubrir carátula, antecedentes y hechos fácticos
-        for i in range(min(6, len(reader.pages))):
+        # Ampliamos a 8 páginas por si los antecedentes son largos
+        for i in range(min(8, len(reader.pages))):
             texto_acumulado += reader.pages[i].extract_text() + " \n "
     except Exception as e:
         return {"accionante": "ERROR_LECTURA", "calidad": "ERROR", "accionado": "ERROR_LECTURA"}
@@ -52,8 +52,11 @@ def motor_juridico_final(pdf_file):
     # --- A. EXTRACCIÓN DEL ACCIONANTE ---
     accionante = "NO IDENTIFICADO"
     patrones_acc = [
-        r"(?:Accionante|Demandante|Actor)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,60})(?=\s*-\s*|\s+Accionado|\s+Demandado|C\.C\.|Cédula|Nit|Expediente)",
-        r"(?:instaurada|promovida|interpuesta)\s+por\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,60})\s+(?:contra|en contra de|frente a)"
+        r"(?:Accionante|Demandante|Actor)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,60})(?=\s*-\s*|\s+Accionado|\s+Demandado|C\.C\.|Cédula|Nit|Expediente)",
+        # Agregamos "presentada", vital para la redacción reciente de la Corte Constitucional
+        r"(?:instaurada|promovida|interpuesta|presentada)\s+por\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,60})\s+(?:contra|en contra de|frente a)",
+        # Captura directa del inicio de los antecedentes
+        r"(?:El señor|La señora|El ciudadano|La ciudadana)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,60})\s+(?:presentó|instauró|interpuso|promovió)"
     ]
     
     for p in patrones_acc:
@@ -65,19 +68,21 @@ def motor_juridico_final(pdf_file):
                 accionante = cand
                 break
 
-    # --- B. EXTRACCIÓN DEL ACCIONADO (Con Resolución de Alias) ---
+    # --- B. EXTRACCIÓN DEL ACCIONADO (Con Resolución de Alias y Paréntesis) ---
     accionado = "NO IDENTIFICADO"
     patrones_ado = [
-        r"(?:Accionado|Demandado|Entidad accionada)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,80})(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente)",
-        r"(?:contra|en contra de)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,80})(?=\.|\,| para | a fin de | por presunta | solicitando| mediante)"
+        r"(?:Accionado|Demandado|Entidad accionada)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,80})(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente)",
+        # Añadimos soporte para leer paréntesis como "(UNP)" y cortes precisos
+        r"(?:contra|en contra de)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)]{4,80}?)(?=\.|\,|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)"
     ]
     
     for p in patrones_ado:
         m = re.search(p, texto_limpio, re.IGNORECASE)
         if m:
             cand = m.group(1).strip().upper()
-            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION"]):
-                accionado = cand
+            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA"]):
+                # Limpiamos paréntesis sueltos al final por si el regex cortó mal
+                accionado = cand.replace(" (UNP)", "").replace("(UNP)", "").strip()
                 break
     
     # Estandarización de Alias Críticos (UNP, Fiscalía)
@@ -90,9 +95,10 @@ def motor_juridico_final(pdf_file):
     calidad = "OTRA (CIVIL/ETC)"
     profesiones = r"(periodista|comunicador|reportero|líder social|defensor de derechos|abogado|firmante de paz|indígena)"
     
-    # 1. Búsqueda por condición explícita
+    # 1. Búsqueda por condición explícita ampliada
     patrones_condicion = [
-        rf"(?:calidad de|condición de|desempeña como|ejerce como|profesión|oficio de)\s+{profesiones}",
+        # Agregamos "es", "profesión de" y "profesión como" que usan las sentencias T-038 y T-040
+        rf"(?:calidad de|condición de|desempeña como|ejerce como|profesión de|profesión como|es)\s+{profesiones}",
         rf"{profesiones}\s+(?:amenazado|amenazada|de profesión|independiente|de la emisora|del canal)"
     ]
     
@@ -105,8 +111,8 @@ def motor_juridico_final(pdf_file):
     # 2. Búsqueda de proximidad (Si no funcionó la explícita)
     if calidad == "OTRA (CIVIL/ETC)" and accionante != "NO IDENTIFICADO":
         primer_nombre = accionante.split()[0]
-        # Busca la profesión a un máximo de 120 caracteres del primer nombre del accionante
-        patron_proximidad = rf"{re.escape(primer_nombre)}.{'{0,120}'}{profesiones}"
+        # Busca la profesión a un máximo de 150 caracteres del primer nombre del accionante
+        patron_proximidad = rf"{re.escape(primer_nombre)}.{'{0,150}'}{profesiones}"
         m_prox = re.search(patron_proximidad, texto_limpio, re.IGNORECASE | re.DOTALL)
         if m_prox:
             calidad = m_prox.group(1).strip().upper()
