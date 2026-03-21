@@ -15,14 +15,13 @@ st.markdown("""
     .main-title { font-size: 38px; font-weight: 700; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; }
     .stButton>button { background-color: #ffc106; color: black; border: 2px solid black; font-weight: bold; width: 100%; height: 50px; }
     .stButton>button:hover { background-color: black; color: #ffc106; }
-    /* Corrección de color de letra en la caja de parámetros */
     .param-box { 
         background-color: #f8f9fa; 
         border: 2px solid #ffc106; 
         padding: 20px; 
         border-radius: 10px; 
         margin-bottom: 25px; 
-        color: #000000 !important; /* Letra negra garantizada */
+        color: #000000 !important; 
     }
     .param-box b, .param-box li, .param-box ul {
         color: #000000 !important;
@@ -45,19 +44,18 @@ if not st.session_state['auth']:
             st.error("Acceso denegado. Clave incorrecta.")
     st.stop()
 
-# --- 3. MOTOR DE EXTRACCIÓN JURÍDICO (TOTALMENTE AGNÓSTICO) ---
+# --- 3. MOTOR DE EXTRACCIÓN JURÍDICO (CORREGIDO FALSOS POSITIVOS) ---
 def motor_juridico_final(pdf_file):
     texto_acumulado = ""
     try:
         pdf_file.seek(0)
         reader = PyPDF2.PdfReader(pdf_file)
-        # Ampliamos el rango de lectura a 10 páginas para garantizar atrapar los hechos fácticos
+        # 10 páginas para garantizar atrapar los hechos fácticos
         for i in range(min(10, len(reader.pages))):
             texto_acumulado += reader.pages[i].extract_text() + " \n "
     except Exception as e:
         return {"accionante": "ERROR_LECTURA", "calidad": "ERROR", "accionado": "ERROR_LECTURA"}
 
-    # Limpieza exhaustiva para evitar que saltos de línea rompan las sentencias
     texto_limpio = re.sub(r'\s+', ' ', texto_acumulado)
 
     # --- A. EXTRACCIÓN DEL ACCIONANTE ---
@@ -76,28 +74,36 @@ def motor_juridico_final(pdf_file):
                 accionante = cand
                 break
 
-    # --- B. EXTRACCIÓN DEL ACCIONADO ---
+    # --- B. EXTRACCIÓN DEL ACCIONADO (MECANISMO ANTIFRAUDE MEJORADO) ---
     accionado = "NO IDENTIFICADO"
     patrones_ado = [
+        # 1. Campos directos en la carátula
         r"(?:Accionado|Demandado|Entidad accionada)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,80})(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente)",
-        r"(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,90}?)(?=\.|\,|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)"
+        # 2. Conectado obligatoriamente a la acción interpuesta (Evita falsos positivos de riesgo/atentados "contra")
+        r"(?:instaurada|promovida|interpuesta|presentada|formulada)\s+por\s+(?:[A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,60}?)\s+(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,90}?)(?=\.|\,|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
+        # 3. Conectado obligatoriamente a la palabra "tutela" o "amparo"
+        r"(?:tutela|amparo|demanda)(?:[^\.]{0,50}?)(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,90}?)(?=\.|\,|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)"
     ]
     
     for p in patrones_ado:
         m = re.search(p, texto_limpio, re.IGNORECASE)
         if m:
             cand = m.group(1).strip().upper()
-            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO"]):
-                # Limpiar paréntesis residuales al final del string si el regex cortó sucio
+            # SE AÑADEN PALABRAS CLAVE DE DERECHOS FUNDAMENTALES (Vida, Integridad, Riesgo) A LA LISTA DE BLOQUEO
+            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO", "VIDA", "INTEGRIDAD", "SALUD", "RIESGO", "LIBERTAD", "IGUALDAD"]):
+                # Limpiar paréntesis residuales al final
                 cand = re.sub(r'\s*\([A-Z0-9]+\)$', '', cand).strip()
                 accionado = cand
                 break
+                
+    # Estandarización de Alias
+    if "UNIDAD NACIONAL DE PROTECC" in accionado or re.search(r"\bUNP\b", accionado):
+        accionado = "UNIDAD NACIONAL DE PROTECCION (UNP)"
+    elif "FISCALIA" in accionado or "NACION" in accionado:
+        if "FISCAL" in accionado: accionado = "FISCALIA GENERAL DE LA NACION"
 
-    # --- C. EXTRACCIÓN DE LA CALIDAD (Agnóstica por lista amplia de poblaciones objeto de tutela) ---
+    # --- C. EXTRACCIÓN DE LA CALIDAD ---
     calidad = "NO IDENTIFICADA (CIVIL)"
-    
-    # Esta lista no es trampa, es el diccionario base de NLP para poblaciones constitucionales.
-    # El motor no fuerza "Periodista", solo detecta de qué población trata el documento.
     poblaciones_clave = r"(periodista|comunicador|reportero|líder social|lideresa social|defensor de derechos|defensora de derechos|abogado|abogada|firmante de paz|indígena|campesino|desplazado|docente)"
     
     patrones_condicion = [
@@ -105,14 +111,12 @@ def motor_juridico_final(pdf_file):
         rf"{poblaciones_clave}\s+(?:amenazado|amenazada|de profesión|independiente|de la emisora|del canal|de la región)"
     ]
     
-    # 1. Buscar condición explícita
     for p in patrones_condicion:
         m = re.search(p, texto_limpio, re.IGNORECASE)
         if m:
             calidad = m.group(1).strip().upper()
             break
             
-    # 2. Búsqueda por proximidad (Si no está el conector "calidad de", busca cerca del nombre del actor)
     if calidad == "NO IDENTIFICADA (CIVIL)" and accionante != "NO IDENTIFICADO":
         primer_nombre = accionante.split()[0]
         patron_proximidad = rf"{re.escape(primer_nombre)}.{'{0,150}'}{poblaciones_clave}"
@@ -120,7 +124,6 @@ def motor_juridico_final(pdf_file):
         if m_prox:
             calidad = m_prox.group(1).strip().upper()
             
-    # Estandarización general
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL"]: calidad = "LÍDER SOCIAL"
                 
@@ -155,7 +158,6 @@ if st.button("🚀 EJECUTAR ANÁLISIS"):
     else:
         with st.spinner("Garzón está leyendo y analizando profundamente los expedientes..."):
             
-            # --- FASE 1: Extraer parámetros de la Arquimédica (La Brújula) ---
             ext_base = motor_juridico_final(file_arq)
             
             st.session_state['html_parametros'] = f"""
@@ -170,37 +172,29 @@ if st.button("🚀 EJECUTAR ANÁLISIS"):
             </div>
             """
 
-            # --- FASE 2: Analizar archivos masivos comparando CONTRA la Arquimédica ---
             resultados = []
             
             for f in files_comp:
                 info = motor_juridico_final(f)
                 fallos = []
                 
-                # REGLA 1: La calidad de la sentencia comparada DEBE ser la misma que la de la Arquimédica
                 if info["calidad"] != ext_base["calidad"]:
                     fallos.append(f"Calidad difiere (Encontró '{info['calidad']}')")
                 
-                # REGLA 2: El accionado debe coincidir. 
-                # Usamos una validación cruzada para perdonar si en un PDF dice "UNP" y en otro "Unidad Nacional de Protección"
-                # Siempre que haya una inclusión significativa de un nombre en el otro, pasa.
                 acc_base = ext_base["accionado"].replace("UNP", "").strip()
                 acc_comp = info["accionado"].replace("UNP", "").strip()
                 
-                # Para evitar falsos positivos si las strings están muy vacías, validamos longitud
                 coincidencia_accionado = False
                 if len(acc_base) > 4 and len(acc_comp) > 4:
                     if acc_base in acc_comp or acc_comp in acc_base:
                         coincidencia_accionado = True
                 
-                # También perdonamos si ambas contienen explícitamente las siglas de la entidad, ej: "UNP"
                 if "UNP" in ext_base["accionado"] and "UNP" in info["accionado"]:
                     coincidencia_accionado = True
                     
                 if not coincidencia_accionado:
                     fallos.append(f"Accionado difiere ('{info['accionado'][:25]}...')")
                 
-                # VEREDICTO
                 estado = "✅ INCLUIDA" if not fallos else "❌ EXCLUIDA"
                 resultados.append({
                     "Archivo": f.name,
@@ -213,7 +207,6 @@ if st.button("🚀 EJECUTAR ANÁLISIS"):
             
             st.session_state['resultados_df'] = pd.DataFrame(resultados)
 
-            # --- FASE 3: Generación del Reporte PDF Seguro ---
             def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
             pdf = FPDF()
             pdf.add_page()
@@ -239,8 +232,6 @@ if st.button("🚀 EJECUTAR ANÁLISIS"):
 
             st.session_state['analisis_terminado'] = True
 
-
-# --- 5. VISUALIZACIÓN DE RESULTADOS FUERA DEL BOTÓN ---
 if st.session_state['analisis_terminado']:
     st.markdown(st.session_state['html_parametros'], unsafe_allow_html=True)
     st.table(st.session_state['resultados_df'])
