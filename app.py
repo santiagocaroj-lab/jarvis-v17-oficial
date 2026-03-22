@@ -12,12 +12,13 @@ import time
 import random
 
 # --- 1. CONFIGURACIÓN Y ESTILOS VISUALES ---
-st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide")
+# La barra lateral se inicializa colapsada por defecto
+st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide", initial_sidebar_state="collapsed")
 
-# Pestaña de configuración lateral (Solo Sonido)
+# Pestaña de configuración lateral
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>⚙️ Configuración</h2>", unsafe_allow_html=True)
-    silenciar_sonido = st.toggle("🔇 Silenciar Música y Efectos", value=False)
+    st.toggle("🔇 Silenciar Música y Efectos", key="silenciar_sonido", value=False)
 
 # Función para cargar imagen o audio en Base64
 def cargar_archivo_base64(ruta):
@@ -85,7 +86,6 @@ st.markdown("""
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
     .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0;
         animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
-    .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -114,68 +114,77 @@ if 'auth' not in st.session_state: st.session_state['auth'] = False
 if 'uploader_key' not in st.session_state: st.session_state['uploader_key'] = 0
 if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = None
 
+# Variables para controlar que la música inicie solo al interactuar
+if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
+if 'musica_pista' not in st.session_state: st.session_state['musica_pista'] = None
 
-# --- 3. GESTOR DE AUDIO GLOBAL AVANZADO (Evita Solapamientos) ---
+# --- 3. GESTOR DE AUDIO GLOBAL AVANZADO ---
 def renderizar_gestor_audio():
-    pagina = st.session_state.get('pagina_actual', 'bienvenida')
+    silenciado = st.session_state.get('silenciar_sonido', False)
+    bg_b64 = ""
+    sfx_b64 = ""
     
-    # Asignar canción de fondo según la página
-    bg_file = "INCIDENTAL1_mezcla.mp3" if pagina in ['bienvenida', 'login', 'cargando'] else "INCIDENTAL 2_mezcla.mp3"
-    sfx_file = st.session_state['sfx_pendiente']
-    
-    bg_b64 = cargar_archivo_base64(bg_file) if bg_file and os.path.exists(bg_file) else ""
-    sfx_b64 = cargar_archivo_base64(sfx_file) if sfx_file and os.path.exists(sfx_file) else ""
-    
-    html_code = f"""
+    # Preparamos las pistas en Base64
+    if not silenciado:
+        if st.session_state['musica_activa'] and st.session_state['musica_pista']:
+            bg_b64 = cargar_archivo_base64(st.session_state['musica_pista'])
+        if st.session_state['sfx_pendiente']:
+            sfx_b64 = cargar_archivo_base64(st.session_state['sfx_pendiente'])
+            
+    js_code = f"""
     <script>
-    const silenciar = {str(silenciar_sonido).lower()};
-    const parentWindow = window.parent;
-
-    // --- MÚSICA DE FONDO CONTINUA ---
-    if (!parentWindow.bgMusicPlayer) {{
-        parentWindow.bgMusicPlayer = new Audio();
-        parentWindow.bgMusicPlayer.loop = true;
-        parentWindow.bgMusicPlayer.volume = 0.4; // Música suave
-    }}
-    
-    if (silenciar) {{
-        parentWindow.bgMusicPlayer.pause();
-    }} else {{
-        const bgB64 = "{bg_b64}";
-        if (bgB64) {{
-            const newSrc = "data:audio/mp3;base64," + bgB64;
-            // Solo cambia la canción si es diferente (evita reinicios y solapamientos)
-            if (parentWindow.bgMusicPlayer.src !== newSrc) {{
-                parentWindow.bgMusicPlayer.src = newSrc;
-                parentWindow.bgMusicPlayer.play().catch(e => console.log("Autoplay bloqueado por navegador"));
-            }} else if (parentWindow.bgMusicPlayer.paused) {{
-                parentWindow.bgMusicPlayer.play().catch(e => console.log("Autoplay bloqueado por navegador"));
-            }}
-        }} else {{
-            parentWindow.bgMusicPlayer.pause();
+    try {{
+        const doc = window.parent.document;
+        const silenciado = {str(silenciado).lower()};
+        
+        // --- MÚSICA DE FONDO ---
+        let bgAudio = doc.getElementById('ecomoda-bg-music');
+        if (!bgAudio) {{
+            bgAudio = doc.createElement('audio');
+            bgAudio.id = 'ecomoda-bg-music';
+            bgAudio.loop = true;
+            bgAudio.volume = 0.3; // Volumen suave
+            doc.body.appendChild(bgAudio);
         }}
-    }}
-
-    // --- EFECTOS DE SONIDO ---
-    if (!parentWindow.sfxAudioPlayer) {{
-        parentWindow.sfxAudioPlayer = new Audio();
-        parentWindow.sfxAudioPlayer.volume = 0.8;
-    }}
-
-    const sfxB64 = "{sfx_b64}";
-    if (!silenciar && sfxB64) {{
-        parentWindow.sfxAudioPlayer.src = "data:audio/mp3;base64," + sfxB64;
-        parentWindow.sfxAudioPlayer.play().catch(e => console.log("Autoplay de SFX bloqueado"));
+        
+        if (silenciado) {{
+            bgAudio.pause();
+        }} else {{
+            const bgStr = "{bg_b64}";
+            if (bgStr) {{
+                const targetSrc = "data:audio/mp3;base64," + bgStr;
+                // Previene reinicios / solapamientos si la pista es la misma
+                if (bgAudio.src !== targetSrc) {{
+                    bgAudio.src = targetSrc;
+                    bgAudio.play().catch(e => console.log("Autoplay bloqueado"));
+                }} else if (bgAudio.paused) {{
+                    bgAudio.play().catch(e => console.log("Autoplay bloqueado"));
+                }}
+            }} else {{
+                bgAudio.pause();
+                bgAudio.src = "";
+            }}
+        }}
+        
+        // --- EFECTOS DE SONIDO ---
+        const sfxStr = "{sfx_b64}";
+        if (sfxStr && !silenciado) {{
+            let sfxAudio = new Audio("data:audio/mp3;base64," + sfxStr);
+            sfxAudio.volume = 0.8;
+            sfxAudio.play().catch(e => console.log("Autoplay SFX bloqueado"));
+        }}
+    }} catch (error) {{
+        console.log("Error de audio:", error);
     }}
     </script>
     """
-    components.html(html_code, width=0, height=0)
+    components.html(js_code, width=0, height=0)
+    
+    # Consumimos el efecto para que no se repita
+    st.session_state['sfx_pendiente'] = None
 
-# Renderizamos el audio en segundo plano
+# Renderizar el audio al principio de la carga de la página
 renderizar_gestor_audio()
-# Limpiamos el efecto para que no suene en repetición
-st.session_state['sfx_pendiente'] = None
-
 
 # --- 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO ---
 def limpiar_texto_usuario(texto):
@@ -365,8 +374,10 @@ def motor_juridico_final(pdf_file):
 
 
 # =====================================================================
-# PANTALLA 1: BIENVENIDA (ECOMODA)
+# RUTEO DE PANTALLAS ESTRICTO
 # =====================================================================
+
+# PANTALLA 1: BIENVENIDA (ECOMODA)
 if st.session_state['pagina_actual'] == 'bienvenida':
     img_html = ""
     if img_logo_b64:
@@ -385,23 +396,22 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button(" 🚀  INGRESAR AL SISTEMA"):
+            # AQUÍ ARRANCA EL SONIDO POR PRIMERA VEZ (Activado por clic humano)
+            st.session_state['musica_activa'] = True
+            st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
             st.session_state['sfx_pendiente'] = "Boton1.mp3"
             st.session_state['pagina_actual'] = 'cargando'
             st.rerun()
 
-    # El link AHORA SÓLO APARECE en esta pantalla
+    # Este bloque solo renderiza si estamos estrictamente en bienvenida
     st.markdown("""
         <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
             📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
         </a>
     """, unsafe_allow_html=True)
-    st.stop()
 
-
-# =====================================================================
 # PANTALLA INTERMEDIA: LÍNEA DE CARGA
-# =====================================================================
-if st.session_state['pagina_actual'] == 'cargando':
+elif st.session_state['pagina_actual'] == 'cargando':
     st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -421,10 +431,8 @@ if st.session_state['pagina_actual'] == 'cargando':
         st.session_state['pagina_actual'] = 'login'
         st.rerun()
 
-# =====================================================================
 # PANTALLA 2: FIREWALL DE SEGURIDAD (LOGIN)
-# =====================================================================
-if st.session_state['pagina_actual'] == 'login':
+elif st.session_state['pagina_actual'] == 'login':
     st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     if img_login_b64:
         st.markdown(f"""
@@ -440,17 +448,16 @@ if st.session_state['pagina_actual'] == 'login':
             if submit_button:
                 if clave == "Juan007":
                     st.session_state['sfx_pendiente'] = "Boton2.mp3"
+                    # Al pasar de la zona de ingreso al análisis, se cambia la pista
+                    st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
                     st.session_state['auth'] = True
                     st.session_state['pagina_actual'] = 'app_garzon'
                     st.rerun()
                 else:
                     st.error("Acceso denegado. Clave incorrecta.")
 
-
-# =====================================================================
 # PANTALLA 3: GARZÓN (MODO AUTOMÁTICO)
-# =====================================================================
-if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth']:
+elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth']:
     st.markdown("<div class='main-title'>GARZÓN - INGENIERÍA EN REVERSA JURISPRUDENCIAL</div>", unsafe_allow_html=True)
     st.markdown("""
         <div style="background-color: #f8f9fa; border-left: 5px solid #0f172a; padding: 15px; margin-bottom: 20px; border-radius: 5px; color: black;">
@@ -463,6 +470,7 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
     with col_nav1:
         if st.button(" 🚪 Cerrar Sesión / Volver a ECOMODA"):
             st.session_state['sfx_pendiente'] = "Boton3.mp3"
+            st.session_state['musica_activa'] = False # Silencia la música al salir
             st.session_state['auth'] = False
             st.session_state['pagina_actual'] = 'bienvenida'
             st.rerun()
@@ -510,7 +518,7 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
     with col_btn1:
         ejecutar = st.button(" 🚀 EJECUTAR ANÁLISIS AUTOMÁTICO")
         if ejecutar:
-            st.session_state['sfx_pendiente'] = "Boton1.mp3"
+            st.session_state['sfx_pendiente'] = "Boton2.mp3"
             if not file_arq or not files_comp:
                 st.error("Faltan archivos para procesar.")
             else:
@@ -624,11 +632,8 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
             mime="application/pdf"
         )
 
-
-# =====================================================================
 # PANTALLA 4: GARZÓN (MODO GUIADO)
-# =====================================================================
-if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state['auth']:
+elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state['auth']:
     st.markdown("<div class='main-title'>GARZÓN - MODO GUIADO (INGRESO MANUAL DE PARÁMETROS)</div>", unsafe_allow_html=True)
     
     if st.button(" 🔙 Volver al Modo Automático"):
@@ -712,7 +717,7 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
     with col_btn1_g:
         ejecutar_g = st.button(" 🚀 EJECUTAR ANÁLISIS GUIADO", key="exec_g")
         if ejecutar_g:
-            st.session_state['sfx_pendiente'] = "Boton1.mp3"
+            st.session_state['sfx_pendiente'] = "Boton2.mp3"
             if not file_arq_g or not files_comp_g:
                 st.error("Faltan archivos para procesar.")
             else:
