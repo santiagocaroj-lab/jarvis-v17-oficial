@@ -227,7 +227,7 @@ def motor_juridico_final(pdf_file):
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL", "DEFENSORA DE DERECHOS", "DEFENSOR DE DERECHOS"]: calidad = "LÍDER SOCIAL"
 
-    # D. EXTRACCIÓN DERECHOS VULNERADOS (NUEVO FILTRO INTELIGENTE Y REESCRITURA)
+    # D. EXTRACCIÓN DERECHOS VULNERADOS (REESCRITURA Y LIMPIEZA EXTREMA)
     derechos_encontrados = set()
     patrones_derecho = [
         r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n|\||T-|Expediente)",
@@ -241,15 +241,17 @@ def motor_juridico_final(pdf_file):
         for m in re.finditer(p, texto_limpio, re.IGNORECASE):
             fragmentos_brutos.append(m.group(1).upper())
 
-    # Frases que indican que la lista de derechos terminó y empieza la petición o relato
+    # Frases que cortan la oración porque ya no es la lista de derechos
     cortes_basura = [
         " CON FIN", " CON EL FIN", " PARA QUE", " SOLICITANDO", " MEDIANTE", " POR PARTE", 
         " HASTA", " A FIN DE", " CONTRA", " CON EL PROPOSITO", " Y EN CONSECUENCIA", 
         " SE LE ORDENE", " EN SEDE", " QUE SE", " PIDIENDO", " CON EL OBJETO", " AL DEBIDO",
-        " AL QUE"
+        " AL QUE", " ORDENAR", " CUMPLA"
     ]
     
-    # El diccionario de la Corte para reescribir limpiamente
+    # Palabras que deben borrarse de los fragmentos pequeños (El filtro de "RESPETÓ SU DE")
+    basura_palabras = ["LA", "EL", "LOS", "LAS", "QUE", "SU", "SUS", "DE", "DEL", "AL", "A", "EN", "POR", "CON", "PARA", "RESPETO", "RESPETÓ", "GARANTICE", "PROTEJA", "ORDENE", "TUTELA", "AMPARO"]
+    
     DERECHOS_MAESTROS = [
         "ADMINISTRACION DE JUSTICIA", "TIERRA", "AGUA POTABLE", "AMBIENTE SANO",
         "ASOCIACION SINDICAL", "AYUDA HUMANITARIA", "CONSULTA PREVIA", "DEBIDO PROCESO",
@@ -264,25 +266,22 @@ def motor_juridico_final(pdf_file):
     ]
 
     for frag in fragmentos_brutos:
-        # Cortar basura (órdenes del juez, solicitudes, etc)
         for corte in cortes_basura:
             if corte in frag:
                 frag = frag.split(corte)[0]
                 
-        # Cambiar conectores por comas para separar bien el listado de derechos
         frag = re.sub(r'\s+Y\s+', ',', frag)
         frag = re.sub(r'\s+E\s+', ',', frag)
         frag = re.sub(r'\s+O\s+', ',', frag)
         partes = [d.strip() for d in frag.split(',')]
         
         for d in partes:
-            # Limpiar palabras innecesarias para dejar el derecho puro
-            d_clean = d.replace("FUNDAMENTALES", "").replace("FUNDAMENTAL", "").replace("DERECHOS", "").replace("DERECHO", "").replace("AL ", "").replace("A LA ", "").replace("A ", "").strip()
+            d_clean = d.replace("FUNDAMENTALES", "").replace("FUNDAMENTAL", "").replace("DERECHOS", "").replace("DERECHO", "").strip()
+            palabras = d_clean.split()
+            # Quitamos todas las palabras basura (ej: RESPETÓ, SU, DE)
+            d_clean = " ".join([w for w in palabras if w not in basura_palabras])
             
-            # Evitar basura residual (como nombres de juzgados o verbos)
-            if len(d_clean) >= 3 and not any(bad in d_clean for bad in ["DEMANDAD", "ACCION", "RESPUESTA", "JUZGADO", "SENTENCIA", "TUTELA", "AMPARO", "ACTOR"]):
-                
-                # REESCRITURA: Cruzar con los maestros de la Corte para limpiarlo perfecto
+            if len(d_clean) >= 3 and not any(bad in d_clean for bad in ["DEMANDAD", "ACCION", "RESPUESTA", "JUZGADO", "SENTENCIA", "ACTOR"]):
                 encontrado = False
                 for dm in DERECHOS_MAESTROS:
                     if dm in d_clean or d_clean in dm:
@@ -290,12 +289,10 @@ def motor_juridico_final(pdf_file):
                         encontrado = True
                         break
                 
-                # Si no está en el maestro pero parece válido y no es una oración gigante, lo agregamos
+                # Si no estaba en el maestro pero quedó limpio y tiene sentido (menos de 30 letras)
                 if not encontrado and len(d_clean) < 30: 
                     derechos_encontrados.add(d_clean)
 
-    # BARRIDO DE EMERGENCIA (Sonar estadístico de Derechos)
-    # Si todo falló, buscar directamente en los hechos/antecedentes (primeras páginas)
     if not derechos_encontrados:
         texto_inicio = texto_limpio[:5000].upper() 
         for dm in DERECHOS_MAESTROS:
@@ -308,7 +305,7 @@ def motor_juridico_final(pdf_file):
                 
     return {"accionante": accionante, "calidad": calidad, "accionado": accionado, "derechos": derechos_finales}
 
-# --- 4. FUNCIONES AUXILIARES DE LIMPIEZA ---
+# --- 4. FUNCIONES AUXILIARES ---
 def limpiar_texto_usuario(texto):
     if not texto: return ""
     texto = str(texto).upper().strip()
@@ -319,6 +316,12 @@ def generar_siglas(nombre):
     palabras_ignoradas = ['DE', 'LA', 'EL', 'LOS', 'LAS', 'Y', 'PARA', 'EN']
     palabras = [p for p in str(nombre).upper().replace("(", "").replace(")", "").split() if p not in palabras_ignoradas]
     return "".join([p[0] for p in palabras if p])
+
+def highlight_veredicto(val):
+    if "✅" in val: return 'background-color: #dcfce7; color: black; font-weight: bold;'
+    elif "⚠️" in val: return 'background-color: #fef08a; color: black; font-weight: bold;'
+    elif "❌" in val: return 'background-color: #fee2e2; color: black;'
+    return ''
 
 
 # =====================================================================
@@ -378,8 +381,9 @@ if st.session_state['pagina_actual'] == 'login':
             st.rerun()
     st.stop()
 
+
 # =====================================================================
-# PANTALLA 3: APLICACIÓN PRINCIPAL (MODO AUTOMÁTICO INTACTO)
+# PANTALLA 3: APLICACIÓN PRINCIPAL (MODO AUTOMÁTICO POTENCIADO)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth']:
     
@@ -439,14 +443,15 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
         else:
             with st.spinner("Garzón está analizando (Modo Automático)..."):
                 ext_base = motor_juridico_final(file_arq)
+                derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
                 
                 st.session_state['html_parametros'] = f"""
                 <div class="param-box">
-                    <b style="font-size: 18px;">📋 PARÁMETROS BASE EXTRAÍDOS DE LA SENTENCIA ARQUIMÉDICA:</b><br><br>
+                    <b style="font-size: 18px;">📋 REGLAS BASE EXTRAÍDAS (Sujeto, Objeto y Tema):</b><br><br>
                     <ul>
-                        <li><b>Calidad Encontrada (Regla):</b> {ext_base['calidad']}</li>
-                        <li><b>Entidad Accionada Encontrada (Regla):</b> {ext_base['accionado']}</li>
-                        <li><b>Derechos Detectados:</b> {", ".join(ext_base['derechos'])}</li>
+                        <li><b>Calidad Encontrada (Sujeto):</b> {ext_base['calidad']}</li>
+                        <li><b>Entidad Accionada Encontrada (Objeto):</b> {ext_base['accionado']}</li>
+                        <li><b>Derechos Detectados (Tema):</b> {", ".join(ext_base['derechos'])}</li>
                     </ul>
                 </div>
                 """
@@ -456,44 +461,114 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                 for f in files_comp:
                     info = motor_juridico_final(f)
                     fallos = []
+                    aciertos = 0
                     
-                    if info["calidad"] != ext_base["calidad"]:
+                    # --- CHECK 1: CALIDAD ---
+                    calidad_limpia_info = limpiar_texto_usuario(info['calidad'])
+                    calidad_limpia_final = limpiar_texto_usuario(ext_base['calidad'])
+                    
+                    if calidad_limpia_final in calidad_limpia_info or calidad_limpia_info in calidad_limpia_final:
+                        aciertos += 1
+                    else:
                         fallos.append(f"Calidad difiere")
                     
-                    acc_base = ext_base["accionado"].strip()
-                    acc_comp = info["accionado"].strip()
+                    # --- CHECK 2: ACCIONADO ---
+                    acc_base = limpiar_texto_usuario(ext_base["accionado"])
+                    acc_comp = limpiar_texto_usuario(info["accionado"])
                     siglas_base = generar_siglas(acc_base)
                     siglas_comp = generar_siglas(acc_comp)
                     
                     coincidencia_accionado = False
-                    if len(acc_base) > 4 and len(acc_comp) > 4:
-                        if acc_base in acc_comp or acc_comp in acc_base:
-                            coincidencia_accionado = True
-                    if not coincidencia_accionado:
-                        if len(siglas_base) >= 2 and siglas_base in acc_comp: coincidencia_accionado = True
-                        elif len(siglas_comp) >= 2 and siglas_comp in acc_base: coincidencia_accionado = True
-                        elif len(siglas_base) >= 2 and siglas_base == siglas_comp: coincidencia_accionado = True
+                    if (len(acc_base) > 2 and len(acc_comp) > 2 and (acc_base in acc_comp or acc_comp in acc_base)) or \
+                       (len(siglas_base) >= 2 and siglas_base in acc_comp) or \
+                       (len(siglas_comp) >= 2 and siglas_comp in acc_base) or \
+                       (len(siglas_base) >= 2 and siglas_base == siglas_comp):
+                        coincidencia_accionado = True
                             
-                    if not coincidencia_accionado:
+                    if coincidencia_accionado:
+                        aciertos += 1
+                    else:
                         fallos.append(f"Accionado difiere")
+                        
+                    # --- CHECK 3: DERECHO (PRESUNCIÓN DE RELEVANCIA) ---
+                    derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
+                    coincidencia_derecho = False
                     
-                    estado = "✅ INCLUIDA" if not fallos else "❌ EXCLUIDA"
+                    if ext_base['derechos'] == ["NO IDENTIFICADO"]:
+                        aciertos += 1
+                        coincidencia_derecho = True
+                    else:
+                        for d_base in derechos_base_limpios:
+                            if d_base == "NO IDENTIFICADO": continue
+                            for d_info in derechos_info_limpios:
+                                if d_base in d_info or d_info in d_base:
+                                    coincidencia_derecho = True
+                                    break
+                            if coincidencia_derecho: break
+                            
+                        if coincidencia_derecho:
+                            aciertos += 1
+                        else:
+                            fallos.append("Derecho difiere")
+
+                    # --- VEREDICTO FINAL POR SEMÁFORO ---
+                    if aciertos == 3:
+                        estado = "✅ INCLUIDA"
+                    elif aciertos == 2:
+                        estado = "⚠️ PRESUNTAMENTE FUNCIONAL: RECOMIENDO REVISIÓN MANUAL"
+                    else:
+                        estado = "❌ EXCLUIDA"
+                        
                     resultados.append({
                         "Archivo": f.name,
+                        "Aciertos": f"{aciertos}/3",
                         "Accionante": info['accionante'],
-                        "Calidad": info['calidad'],
-                        "Accionado": info["accionado"],
-                        "Derechos": ", ".join(info['derechos']),
+                        "Calidad Evaluada": info['calidad'],
+                        "Accionado Evaluado": info["accionado"],
+                        "Derechos Evaluados": ", ".join(info['derechos']),
                         "Veredicto": estado,
-                        "Motivo": ", ".join(fallos) if fallos else "Cumple exacto con Arquimédica"
+                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple los 3 criterios"
                     })
                 
                 st.session_state['resultados_df'] = pd.DataFrame(resultados)
+                
+                def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 14)
+                pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (AUTOMÁTICO) - GARZON", 0, 1, 'C')
+                pdf.set_font("Arial", '', 10)
+                pdf.ln(5)
+                pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA (ARQUIMÉDICA):\nSujeto (Calidad): {ext_base['calidad']}\nObjeto (Accionado): {ext_base['accionado']}\nTema (Derecho): {', '.join(ext_base['derechos'])}\n" + "="*50))
+                
+                for r in resultados:
+                    if "INCLUIDA" in r["Veredicto"]:
+                        pdf.set_fill_color(220, 255, 220)
+                    elif "PRESUNTAMENTE" in r["Veredicto"]:
+                        pdf.set_fill_color(255, 255, 153)
+                    else:
+                        pdf.set_fill_color(255, 220, 220)
+                        
+                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']} ({r['Aciertos']} Aciertos)"), 1, 1, 'L', True)
+                    pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
+                    pdf.ln(2)
+
+                try:
+                    st.session_state['pdf_binario'] = pdf.output(dest='S').encode('latin-1')
+                except AttributeError:
+                    st.session_state['pdf_binario'] = bytes(pdf.output())
+                    
                 st.session_state['analisis_terminado'] = True
 
     if st.session_state['analisis_terminado']:
         st.markdown(st.session_state['html_parametros'], unsafe_allow_html=True)
-        st.table(st.session_state['resultados_df'])
+        st.dataframe(st.session_state['resultados_df'].style.map(highlight_veredicto, subset=['Veredicto']))
+        st.download_button(
+            label="📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
+            data=st.session_state['pdf_binario'], 
+            file_name="reporte_automatico_linea_jurisprudencial.pdf",
+            mime="application/pdf"
+        )
 
 
 # =====================================================================
@@ -734,15 +809,42 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                     })
                 
                 st.session_state['resultados_df_g'] = pd.DataFrame(resultados)
+                
+                def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 14)
+                pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (GUIADO) - GARZON", 0, 1, 'C')
+                pdf.set_font("Arial", '', 10)
+                pdf.ln(5)
+                pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA:\nSujeto (Calidad): {final_calidad}\nObjeto (Accionado): {final_accionado_display}\nTema (Derecho): {final_derecho_display.replace('<br><small>','').replace('</small>','')}\n" + "="*50))
+                
+                for r in resultados:
+                    if "INCLUIDA" in r["Veredicto"]:
+                        pdf.set_fill_color(220, 255, 220) # Verde
+                    elif "PRESUNTAMENTE" in r["Veredicto"]:
+                        pdf.set_fill_color(255, 255, 153) # Amarillo
+                    else:
+                        pdf.set_fill_color(255, 220, 220) # Rojo
+                        
+                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']} ({r['Aciertos']} Aciertos)"), 1, 1, 'L', True)
+                    pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
+                    pdf.ln(2)
+
+                try:
+                    st.session_state['pdf_binario_g'] = pdf.output(dest='S').encode('latin-1')
+                except AttributeError:
+                    st.session_state['pdf_binario_g'] = bytes(pdf.output())
+                    
                 st.session_state['analisis_terminado_g'] = True
 
     if st.session_state['analisis_terminado_g']:
         st.markdown(st.session_state['html_parametros_g'], unsafe_allow_html=True)
-        # Aplicamos estilos a la tabla para que el usuario diferencie mejor
-        def highlight_veredicto(val):
-            if "✅" in val: return 'background-color: #dcfce7; color: black; font-weight: bold;'
-            elif "⚠️" in val: return 'background-color: #fef08a; color: black; font-weight: bold;'
-            elif "❌" in val: return 'background-color: #fee2e2; color: black;'
-            return ''
-            
         st.dataframe(st.session_state['resultados_df_g'].style.map(highlight_veredicto, subset=['Veredicto']))
+        
+        st.download_button(
+            label="📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
+            data=st.session_state['pdf_binario_g'], 
+            file_name="reporte_guiado_linea_jurisprudencial.pdf",
+            mime="application/pdf"
+        )
