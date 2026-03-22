@@ -127,20 +127,20 @@ st.markdown("""
     /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA --- */
     div[data-testid="stTextInput"], .stButton {
         position: relative;
-        z-index: 10; /* Asegura que la barra de texto y botones estén por encima de todo */
+        z-index: 10; 
     }
     
     .login-img-container {
-        position: fixed; /* Fija la imagen en relación a la ventana de visualización */
-        bottom: 0px; /* ¡Ancla el corte inferior de la imagen exactamente al borde de la pantalla! */
-        right: 2%; /* La recuesta hacia la derecha de la pantalla */
-        height: 75vh; /* Altura idónea (75% de la pantalla) */
-        width: auto; /* Mantiene proporciones sin deformar */
+        position: fixed; /* Fija la imagen a la ventana */
+        bottom: 0px; /* Anclada al piso de la pantalla */
+        right: -12%; /* CORRECCIÓN: Se mueve significativamente a la derecha para no tapar el texto central */
+        height: 80vh; /* Tamaño idóneo */
+        width: auto; 
         object-fit: contain;
         opacity: 0;
-        animation: fadeIn 1.5s ease 0.3s forwards; /* Fade in con ligero retraso */
-        z-index: 0; /* Manda la imagen al fondo */
-        pointer-events: none; /* Permite que los clics la atraviesen (para no bloquear la contraseña) */
+        animation: fadeIn 1.5s ease 0.3s forwards; 
+        z-index: 999; /* CORRECCIÓN: Capa superior, por encima de todos los elementos */
+        pointer-events: none; /* Permite que los clics atraviesen la imagen transparente */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -198,7 +198,8 @@ def motor_juridico_final(pdf_file):
     patrones_ado = [
         r"(?:Accionado|Demandado|Entidad accionada)[s]?\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,80})(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente)",
         r"(?:instaurada|promovida|interpuesta|presentada|formulada)\s+por\s+(?:[A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,60}?)\s+(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,90}?)(?=\.|\,|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
-        r"(?:tutela|amparo|demanda)(?:[^\.]{0,50}?)(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,90}?)(?=\.|\,|\n|y otro|y otros)"
+        r"(?:tutela|amparo|demanda)(?:[^\.]{0,50}?)(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,90}?)(?=\.|\,|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
+        r"(?:contra|en contra de)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_-]{4,60}?)(?=\.|\,|\n|y otro|y otros)"
     ]
     for p in patrones_ado:
         m = re.search(p, texto_limpio, re.IGNORECASE)
@@ -384,7 +385,7 @@ if st.session_state['pagina_actual'] == 'bienvenida':
 if st.session_state['pagina_actual'] == 'login':
     st.markdown("<div class='main-title'>🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     
-    # --- IMAGEN ANCLADA EN EL FONDO DE LA PANTALLA ---
+    # --- IMAGEN ANCLADA Y EN CAPA SUPERIOR ---
     nombre_imagen_login = "IMAGEN (3).png"
     if os.path.exists(nombre_imagen_login):
         with open(nombre_imagen_login, "rb") as image_file:
@@ -392,7 +393,7 @@ if st.session_state['pagina_actual'] == 'login':
         st.markdown(f"""
             <img src="data:image/png;base64,{encoded_login}" class="login-img-container">
             """, unsafe_allow_html=True)
-    # -------------------------------------------------
+    # -----------------------------------------
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
