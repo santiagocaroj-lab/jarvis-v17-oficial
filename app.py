@@ -68,8 +68,8 @@ st.markdown("""
         line-height: 1.6;
     }
     
-    /* --- BOTONES --- */
-    .stButton>button { 
+    /* --- BOTONES Y FORMULARIOS --- */
+    .stButton>button, div[data-testid="stFormSubmitButton"]>button { 
         background-color: #ffc106; 
         color: black; 
         border: 2px solid black; 
@@ -81,7 +81,9 @@ st.markdown("""
         transition: all 0.3s ease; 
         border-radius: 8px;
     }
-    .stButton>button:hover { background-color: black; color: #ffc106; transform: scale(1.02); }
+    .stButton>button:hover, div[data-testid="stFormSubmitButton"]>button:hover { 
+        background-color: black; color: #ffc106; transform: scale(1.02); 
+    }
     
     .btn-guiado>button { background-color: #0f172a; color: #ffc106; border: 2px solid #ffc106; }
     .btn-guiado>button:hover { background-color: #ffc106; color: #0f172a; }
@@ -124,23 +126,32 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA --- */
-    div[data-testid="stTextInput"], .stButton {
+    /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA Y FORMULARIO --- */
+    div[data-testid="stTextInput"], .stButton, div[data-testid="stFormSubmitButton"] {
         position: relative;
         z-index: 10; 
     }
     
+    /* Hace que la barra de contraseña sea más corta y centrada */
+    div[data-testid="stForm"] {
+        border: none;
+        padding: 0;
+        max-width: 350px;
+        margin: 0 auto;
+        background-color: transparent;
+    }
+    
     .login-img-container {
-        position: fixed; /* Fija la imagen a la ventana */
-        bottom: 0px; /* Anclada al piso de la pantalla */
-        right: -12%; /* CORRECCIÓN: Se mueve significativamente a la derecha para no tapar el texto central */
-        height: 80vh; /* Tamaño idóneo */
+        position: fixed; 
+        bottom: 0px; 
+        right: -12%; 
+        height: 80vh; 
         width: auto; 
         object-fit: contain;
         opacity: 0;
         animation: fadeIn 1.5s ease 0.3s forwards; 
-        z-index: 999; /* CORRECCIÓN: Capa superior, por encima de todos los elementos */
-        pointer-events: none; /* Permite que los clics atraviesen la imagen transparente */
+        z-index: 999; 
+        pointer-events: none; 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -380,7 +391,7 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     st.stop()
 
 # =====================================================================
-# PANTALLA 2: FIREWALL DE SEGURIDAD
+# PANTALLA 2: FIREWALL DE SEGURIDAD (CON FORMULARIO PARA TECLA ENTER)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'login':
     st.markdown("<div class='main-title'>🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
@@ -398,14 +409,21 @@ if st.session_state['pagina_actual'] == 'login':
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.info("Por favor, identifícate para acceder al motor de análisis.")
-        clave = st.text_input("Ingrese la clave de seguridad:", type="password")
-        if st.button("INGRESAR"):
-            if clave == "Juan007":
-                st.session_state['auth'] = True
-                st.session_state['pagina_actual'] = 'app_garzon'
-                st.rerun()
-            else:
-                st.error("Acceso denegado. Clave incorrecta.")
+        
+        # --- FORMULARIO (Soporta tecla Enter y acorta la barra) ---
+        with st.form(key='login_form', clear_on_submit=False):
+            clave = st.text_input("Ingrese la clave de seguridad:", type="password")
+            submit_button = st.form_submit_button("INGRESAR")
+            
+            if submit_button:
+                if clave == "Juan007":
+                    st.session_state['auth'] = True
+                    st.session_state['pagina_actual'] = 'app_garzon'
+                    st.rerun()
+                else:
+                    st.error("Acceso denegado. Clave incorrecta.")
+        # ---------------------------------------------------------
+        
         st.write("") 
         if st.button("🔙 Volver al inicio"):
             st.session_state['pagina_actual'] = 'bienvenida'
