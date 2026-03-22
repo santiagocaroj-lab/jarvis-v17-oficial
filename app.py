@@ -76,25 +76,20 @@ st.markdown("""
         padding: 12px 10px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease; border-radius: 8px; text-decoration: none; margin-top: 15px; font-size: 13px;
     }
     .guide-button:hover { background-color: #ffc106; color: black; transform: scale(1.02); text-decoration: none; }
+    
     .param-box { background-color: #f8f9fa; border: 2px solid #ffc106; padding: 20px; border-radius: 10px; margin-bottom: 25px; color: #000000 !important; }
     .param-box b, .param-box li, .param-box ul { color: #000000 !important; }
 
-    /* --- ESTILOS PARA IMAGEN DE LOGIN Y FORMULARIO --- */
+    /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA Y FORMULARIO --- */
     div[data-testid="stTextInput"], .stButton, div[data-testid="stFormSubmitButton"] { position: relative; z-index: 10; }
+    
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
     
-    /* Contenedor relativo: el secreto para que se desplace con Streamlit */
-    .login-wrapper {
-        position: relative;
-        width: 100%;
-        min-height: 75vh;
-    }
-    
-    /* Imagen anclada al lado derecho de su contenedor relativo */
     .login-img-container { 
-        position: absolute; 
-        bottom: -30px; 
-        right: -5%; /* Ajusta si la quieres más o menos salida del borde */
+        position: fixed; 
+        bottom: 0px; 
+        /* Right se gestiona por JS para moverse dinámicamente */
+        right: -12%; 
         height: 80vh; 
         width: auto; 
         object-fit: contain; 
@@ -102,6 +97,7 @@ st.markdown("""
         animation: fadeIn 1.2s ease 0.1s forwards; 
         z-index: 999; 
         pointer-events: none; 
+        transition: right 0.3s ease-out; /* Esta transición asegura la fluidez al abrir el menú */
     }
     
     /* Estilos para centrar la barra de carga */
@@ -136,8 +132,26 @@ if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = 
 if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
 if 'musica_pista' not in st.session_state: st.session_state['musica_pista'] = None
 
-# --- 3. GESTOR DE AUDIO GLOBAL AVANZADO ---
-def renderizar_gestor_audio():
+# --- BARAJEADO PERFECTO DE FRASES (GARANTIZA NO REPETIR) ---
+if 'frases_disponibles' not in st.session_state or not st.session_state['frases_disponibles']:
+    todas_las_frases = [
+        "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", 
+        "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
+        "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", 
+        "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
+        "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico ☕...", 
+        "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial...",
+        "Traduciendo 'lenguaje jurídico' a 'lenguaje humano'...", "Consultando a la Corte... (modo intenso activado)",
+        "¿Seguro que esto no podía ser más simple?", "Cuando creías que ya habías terminado... aparece otra sentencia",
+        "Cruzando criterios de las altas cortes...", "Intentando que todo esto tenga sentido...",
+        "Negociando con precedentes rebeldes..."
+    ]
+    random.shuffle(todas_las_frases) # Se barajan al azar
+    st.session_state['frases_disponibles'] = todas_las_frases
+
+
+# --- 3. GESTOR DE AUDIO GLOBAL Y JS DINÁMICO ---
+def renderizar_gestor_y_efectos():
     silenciado = st.session_state.get('silenciar_sonido', False)
     bg_b64 = ""
     sfx_b64 = ""
@@ -152,9 +166,9 @@ def renderizar_gestor_audio():
     <script>
     try {{
         const doc = window.parent.document;
-        const silenciado = {str(silenciado).lower()};
         
-        // --- MÚSICA DE FONDO ---
+        // 1. GESTIÓN DEL AUDIO
+        const silenciado = {str(silenciado).lower()};
         let bgAudio = doc.getElementById('ecomoda-bg-music');
         if (!bgAudio) {{
             bgAudio = doc.createElement('audio');
@@ -182,23 +196,47 @@ def renderizar_gestor_audio():
             }}
         }}
         
-        // --- EFECTOS DE SONIDO ---
         const sfxStr = "{sfx_b64}";
         if (sfxStr && !silenciado) {{
             let sfxAudio = new Audio("data:audio/mp3;base64," + sfxStr);
             sfxAudio.volume = 0.8;
-            sfxAudio.currentTime = 0.25; // Salto instantáneo eliminando el silencio inicial
             sfxAudio.play().catch(e => console.log("Autoplay SFX bloqueado"));
         }}
+
+        // 2. GESTIÓN DEL DESPLAZAMIENTO FLUIDO DE LA IMAGEN
+        const checkImg = setInterval(() => {{
+            const img = doc.querySelector('.login-img-container');
+            const mainBlock = doc.querySelector('[data-testid="stAppViewBlockContainer"]');
+            
+            if (img && mainBlock) {{
+                clearInterval(checkImg); // Dejamos de buscar una vez lo encuentra
+                
+                const updateImgPosition = () => {{
+                    const rect = mainBlock.getBoundingClientRect();
+                    // Calculamos el espacio a la derecha del contenedor central
+                    const gapDerecho = window.innerWidth - rect.right;
+                    // Restamos unos píxeles para que la imagen mantenga su desborde característico
+                    img.style.right = (gapDerecho - 80) + "px"; 
+                }};
+                
+                // Observamos cualquier cambio de tamaño o margen (como al abrir configuración)
+                const observer = new ResizeObserver(updateImgPosition);
+                observer.observe(mainBlock);
+                updateImgPosition(); // Aplicar de inmediato
+            }}
+        }}, 100);
+        // Detener después de 3 segundos si no estamos en la página del login
+        setTimeout(() => clearInterval(checkImg), 3000);
+
     }} catch (error) {{
-        console.log("Error de audio:", error);
+        console.log("Error de JS:", error);
     }}
     </script>
     """
     components.html(js_code, width=0, height=0)
     st.session_state['sfx_pendiente'] = None
 
-renderizar_gestor_audio()
+renderizar_gestor_y_efectos()
 
 # --- 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO ---
 def limpiar_texto_usuario(texto):
@@ -213,14 +251,16 @@ def generar_siglas(nombre):
     return "".join([p[0] for p in palabras if p])
 
 def highlight_veredicto(val):
-    if " ✅ " in val: return 'background-color: #dcfce7; color: black; font-weight: bold;'
-    elif " ⚠️ " in val: return 'background-color: #fef08a; color: black; font-weight: bold;'
-    elif " ❌ " in val: return 'background-color: #fee2e2; color: black;'
+    if isinstance(val, str):
+        if "✅" in val: return 'background-color: #dcfce7; color: black; font-weight: bold;'
+        elif "⚠️" in val: return 'background-color: #fef08a; color: black; font-weight: bold;'
+        elif "❌" in val: return 'background-color: #fee2e2; color: black;'
     return ''
 
 def limpiar_y_separar_sujetos(texto):
     texto_limpio = limpiar_texto_usuario(texto)
-    sujetos = re.split(r'\s+Y\s+|\s+E\s+|,', texto_limpio)
+    texto_limpio = re.sub(r'\[T[-\w\.]+\]\s*', '', texto_limpio)
+    sujetos = re.split(r'\s+Y\s+|\s+E\s+|,|\|', texto_limpio)
     return [s.strip() for s in sujetos if len(s.strip()) > 3]
 
 def motor_juridico_final(pdf_file):
@@ -235,43 +275,98 @@ def motor_juridico_final(pdf_file):
     
     texto_limpio = re.sub(r'\s+', ' ', texto_acumulado)
     
-    accionante = "NO IDENTIFICADO"
-    patrones_acc = [
-        r"(?:Accionantes?|Demandantes?|Actores?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)(?=\s*-\s*|\s+Accionado|\s+Demandado|C\.C\.|Cédula|Nit|Expediente|\n)",
-        r"(?:instaurada|promovida|interpuesta|presentada|formulada)[s]?\s+por\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de|frente a)",
-        r"(?:El señor|La señora|Los señores|Las señoras|El ciudadano|La ciudadana)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:presentó|instauraron|instauró|interpuso|promovió|formuló)",
-        r"(?:Acción de tutela de|amparo propuesto por)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de)"
-    ]
-    for p in patrones_acc:
-        m = re.search(p, texto_limpio, re.IGNORECASE)
-        if m:
-            cand = m.group(1).strip().upper()
-            if not any(b in cand for b in ["MAGISTRAD", "SALA", "CORTE", "JUEZ", "REVISION", "TUTELA"]):
-                accionante = cand
-                break
-                
-    accionado = "NO IDENTIFICADO"
-    patrones_ado = [
-        r"(?:Accionados?|Demandados?|Entidad accionada|Entidades accionadas)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{3,150}?)(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente|\n)",
-        r"(?:instaurada|promovida|interpuesta|presentada|formulada)[s]?\s+por\s+(?:[A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{4,150}?)(?=\.|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
-        r"(?:tutela|amparo|demanda)(?:[^\.]{0,50}?)(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{4,150}?)(?=\.|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
-        r"(?:contra|en contra de)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{4,150}?)(?=\.|\n| para | a fin de | cuyo | quienes)"
-    ]
-    for p in patrones_ado:
-        m = re.search(p, texto_limpio, re.IGNORECASE)
-        if m:
-            cand = m.group(1).strip().upper()
-            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO", "VIDA", "INTEGRIDAD", "SALUD", "RIESGO", "LIBERTAD", "IGUALDAD"]):
-                cand = re.sub(r'\s*\([A-Z0-9]+\)$', '', cand).strip()
-                accionado = cand
-                break
+    expedientes = []
+    es_multiple = False
+    
+    m_ref = re.search(r"(?:Referencia|Ref)\s*:?(.*?)(?:Asunto\s*:|Magistrad|Tema|Procedencia|Accionantes?|Demandantes?)", texto_limpio, re.IGNORECASE | re.DOTALL)
+    if m_ref:
+        bloque_ref = m_ref.group(1)
+        expedientes_crudos = re.findall(r"T\s*[\.\-\_]?\s*\d{1,3}(?:\.\d{3})*(?:\s*AC)?", bloque_ref, re.IGNORECASE)
+        for e in expedientes_crudos:
+            e_clean = re.sub(r'\s+', '', e).upper()
+            if e_clean not in expedientes:
+                expedientes.append(e_clean)
 
-    if accionado == "NO IDENTIFICADO":
-        m_salvavidas = re.search(r"contra\s+(?:la\s+|el\s+|los\s+|las\s+)?([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ\s\,]{4,150}?)(?=\.|\n| a | para |/| en |\()", texto_limpio)
-        if m_salvavidas:
-            cand = m_salvavidas.group(1).strip().upper()
-            if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO", "VIDA", "INTEGRIDAD", "SALUD", "PETICION"]):
-                accionado = cand
+    if len(expedientes) > 1:
+        es_multiple = True
+        try:
+            st.toast(f"¡Uy! Detecté {len(expedientes)} expedientes acumulados en {pdf_file.name}. Esto será más complejo de lo que pensé... 🤯", icon="🤯")
+        except:
+            pass
+
+    accionantes_lista = []
+    accionados_lista = []
+
+    if es_multiple:
+        m_asunto = re.search(r"Asunto\s*:?(.*?)(?:Magistrad|Tema|Sentencia|Fundamentos|Corte Constitucional|I\.\s*ANTECEDENTES)", texto_limpio, re.IGNORECASE | re.DOTALL)
+        if m_asunto:
+            bloque_asunto = m_asunto.group(1).strip()
+            bloque_asunto = re.sub(r'(?i)(?:acciones de tutela presentadas por|acción de tutela interpuesta por|tutelas instauradas por|tutela formulada por)', '', bloque_asunto)
+            
+            casos = re.split(r';\s*y\s*|;|\.|\n| - | — ', bloque_asunto, flags=re.IGNORECASE)
+            for caso in casos:
+                caso_limpio = re.sub(r'^\s*(?:y\s+|e\s+|por\s+|de\s+)', '', caso, flags=re.IGNORECASE).strip()
+                
+                if "contra" in caso_limpio.lower() or "frente a" in caso_limpio.lower():
+                    m_pair = re.search(r"([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de|frente a)\s+(?:la\s+|el\s+|los\s+|las\s+)?([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{3,150}?)(?=$|para\s|a fin de\s)", caso_limpio, re.IGNORECASE)
+                    if m_pair:
+                        acc = m_pair.group(1).strip().upper()
+                        ado = m_pair.group(2).strip().upper()
+                        acc = re.sub(r'^(?:LA SEÑORA|EL SEÑOR|LOS CIUDADANOS)\s*', '', acc).strip()
+                        accionantes_lista.append(acc)
+                        accionados_lista.append(ado)
+                        
+    accionante = "NO IDENTIFICADO"
+    accionado = "NO IDENTIFICADO"
+
+    if not accionantes_lista or not accionados_lista:
+        patrones_acc = [
+            r"(?:Accionantes?|Demandantes?|Actores?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)(?=\s*-\s*|\s+Accionado|\s+Demandado|C\.C\.|Cédula|Nit|Expediente|\n)",
+            r"(?:instaurada|promovida|interpuesta|presentada|formulada)[s]?\s+por\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de|frente a)",
+            r"(?:El señor|La señora|Los señores|Las señoras|El ciudadano|La ciudadana)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:presentó|instauraron|instauró|interpuso|promovió|formuló)",
+            r"(?:Acción de tutela de|amparo propuesto por)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de)"
+        ]
+        for p in patrones_acc:
+            m = re.search(p, texto_limpio, re.IGNORECASE)
+            if m:
+                cand = m.group(1).strip().upper()
+                if not any(b in cand for b in ["MAGISTRAD", "SALA", "CORTE", "JUEZ", "REVISION", "TUTELA"]):
+                    if es_multiple: accionante = f"[MÚLTIPLES EXP] {cand}"
+                    else: accionante = cand
+                    break
+                    
+        patrones_ado = [
+            r"(?:Accionados?|Demandados?|Entidad accionada|Entidades accionadas)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{3,150}?)(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente|\n)",
+            r"(?:instaurada|promovida|interpuesta|presentada|formulada)[s]?\s+por\s+(?:[A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{4,150}?)(?=\.|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
+            r"(?:tutela|amparo|demanda)(?:[^\.]{0,50}?)(?:contra|en contra de|frente a)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{4,150}?)(?=\.|\n| para | a fin de | por presunta | solicitando| mediante| \(en adelante)",
+            r"(?:contra|en contra de)(?: la| el| los| las)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{4,150}?)(?=\.|\n| para | a fin de | cuyo | quienes)"
+        ]
+        for p in patrones_ado:
+            m = re.search(p, texto_limpio, re.IGNORECASE)
+            if m:
+                cand = m.group(1).strip().upper()
+                if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO", "VIDA", "INTEGRIDAD", "SALUD", "RIESGO", "LIBERTAD", "IGUALDAD"]):
+                    cand = re.sub(r'\s*\([A-Z0-9]+\)$', '', cand).strip()
+                    if es_multiple: accionado = f"[MÚLTIPLES EXP] {cand}"
+                    else: accionado = cand
+                    break
+
+        if accionado == "NO IDENTIFICADO" or accionado == "[MÚLTIPLES EXP] NO IDENTIFICADO":
+            m_salvavidas = re.search(r"contra\s+(?:la\s+|el\s+|los\s+|las\s+)?([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ\s\,]{4,150}?)(?=\.|\n| a | para |/| en |\()", texto_limpio)
+            if m_salvavidas:
+                cand = m_salvavidas.group(1).strip().upper()
+                if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO", "VIDA", "INTEGRIDAD", "SALUD", "PETICION"]):
+                    if es_multiple: accionado = f"[MÚLTIPLES EXP] {cand}"
+                    else: accionado = cand
+    else:
+        acc_str = ""
+        ado_str = ""
+        for i in range(len(accionantes_lista)):
+            exp_label = expedientes[i] if i < len(expedientes) else f"EXP_{i+1}"
+            acc_str += f"[{exp_label}] {accionantes_lista[i]} | "
+            ado_str += f"[{exp_label}] {accionados_lista[i]} | "
+        accionante = acc_str.strip(" | ")
+        accionado = ado_str.strip(" | ")
                 
     calidad = "NO IDENTIFICADA (CIVIL)"
     poblaciones_lista = ["periodista", "comunicador", "reportero", "líder social", "lideresa social", "defensor de derechos", "defensora de derechos", "abogado", "abogada", "firmante de paz", "indígena", "campesino", "desplazado", "docente"]
@@ -288,7 +383,7 @@ def motor_juridico_final(pdf_file):
             break
 
     if calidad == "NO IDENTIFICADA (CIVIL)" and accionante != "NO IDENTIFICADO":
-        primer_nombre = accionante.split()[0]
+        primer_nombre = limpiar_texto_usuario(accionante).split()[0].replace("[", "").replace("]", "")
         patron_proximidad = rf"{re.escape(primer_nombre)}.{'{0,150}'}{poblaciones_clave}"
         m_prox = re.search(patron_proximidad, texto_limpio, re.IGNORECASE | re.DOTALL)
         if m_prox:
@@ -383,37 +478,33 @@ def motor_juridico_final(pdf_file):
     return {"accionante": accionante, "calidad": calidad, "accionado": accionado, "derechos": derechos_finales}
 
 # =====================================================================
-# RUTEO DE PANTALLAS ESTRICTO CON PROTECCIÓN GHOSTING
+# RUTEO DE PANTALLAS ESTRICTO
 # =====================================================================
 
 # PANTALLA 1: BIENVENIDA (ECOMODA)
 if st.session_state['pagina_actual'] == 'bienvenida':
-    bienvenida_placeholder = st.empty()
-    
-    with bienvenida_placeholder.container():
-        img_html = ""
-        if img_logo_b64:
-            img_html = f"<img src='data:image/png;base64,{img_logo_b64}' width='140' style='border-radius: 10px;'>"
-        st.markdown(f"""
-        <div class='welcome-wrapper'>
-            {img_html}
-            <div class='ecomoda-header'>Ecomoda - Servidor Jurídico</div>
-            <div class='welcome-title'>Análisis Jurisprudencial para Periodistas</div>
-            <div class='welcome-subtitle'>
-                Descubre las líneas jurisprudenciales clave de la Corte Constitucional mediante nuestro motor de inteligencia artificial <b>'Garzón'</b>.
-            </div>
+    img_html = ""
+    if img_logo_b64:
+        img_html = f"<img src='data:image/png;base64,{img_logo_b64}' width='140' style='border-radius: 10px;'>"
+    st.markdown(f"""
+    <div class='welcome-wrapper'>
+        {img_html}
+        <div class='ecomoda-header'>Ecomoda - Servidor Jurídico</div>
+        <div class='welcome-title'>Análisis Jurisprudencial para Periodistas</div>
+        <div class='welcome-subtitle'>
+            Descubre las líneas jurisprudenciales clave de la Corte Constitucional mediante nuestro motor de inteligencia artificial <b>'Garzón'</b>.
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button(" 🚀  INGRESAR AL SISTEMA"):
-                st.session_state['musica_activa'] = True
-                st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
-                st.session_state['sfx_pendiente'] = "Boton1.mp3"
-                st.session_state['pagina_actual'] = 'cargando'
-                bienvenida_placeholder.empty()
-                st.rerun()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button(" 🚀  INGRESAR AL SISTEMA"):
+            st.session_state['musica_activa'] = True
+            st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
+            st.session_state['sfx_pendiente'] = "Boton1.mp3"
+            st.session_state['pagina_actual'] = 'cargando'
+            st.rerun()
 
         st.markdown("""
             <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
@@ -423,73 +514,59 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     
     st.stop()
 
-# PANTALLA INTERMEDIA: LÍNEA DE CARGA
+# PANTALLA INTERMEDIA: LÍNEA DE CARGA (Minimalista y Rápida)
 elif st.session_state['pagina_actual'] == 'cargando':
-    cargando_placeholder = st.empty()
-    
-    with cargando_placeholder.container():
-        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1])
+    st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-        with col2:
-            mensajes_carga = [
-                "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
-                "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
-                "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico  ☕ ...", "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial..."
-            ]
-            mensaje_actual = random.choice(mensajes_carga)
-            st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
-            barra_carga = st.progress(0)
-            for porcentaje in range(100):
-                time.sleep(0.015)
-                barra_carga.progress(porcentaje + 1)
-                
-    cargando_placeholder.empty()
-    st.session_state['pagina_actual'] = 'login'
-    st.rerun()
+    with col2:
+        # Se saca un mensaje que no se haya repetido
+        mensaje_actual = st.session_state['frases_disponibles'].pop()
+        
+        st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
+        barra_carga = st.progress(0)
+        
+        for porcentaje in range(100):
+            time.sleep(0.01) # Ultra rápido para no hacer esperar
+            barra_carga.progress(porcentaje + 1)
+            
+        st.session_state['pagina_actual'] = 'login'
+        st.rerun()
+        
+    st.stop()
 
 # PANTALLA 2: FIREWALL DE SEGURIDAD (LOGIN)
 elif st.session_state['pagina_actual'] == 'login':
-    login_placeholder = st.empty()
+    st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     
-    with login_placeholder.container():
-        # Envolvemos TODO el login en un div 'relative'
-        st.markdown("<div class='login-wrapper'>", unsafe_allow_html=True)
-        
-        st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
-        
-        if img_login_b64:
-            st.markdown(f"""
-                <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
-                """, unsafe_allow_html=True)
+    if img_login_b64:
+        st.markdown(f"""
+            <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
+            """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.info("Por favor, identifícate para acceder al motor de análisis.")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.info("Por favor, identifícate para acceder al motor de análisis.")
+        
+        with st.form(key='login_form', clear_on_submit=False):
+            clave = st.text_input("Ingrese la clave de seguridad:", type="password")
+            submit_button = st.form_submit_button("INGRESAR")
             
-            with st.form(key='login_form', clear_on_submit=False):
-                clave = st.text_input("Ingrese la clave de seguridad:", type="password")
-                submit_button = st.form_submit_button("INGRESAR")
-                
-                if submit_button:
-                    if clave == "Juan007":
-                        st.session_state['sfx_pendiente'] = "Boton2.mp3"
-                        st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
-                        st.session_state['auth'] = True
-                        st.session_state['pagina_actual'] = 'app_garzon'
-                        login_placeholder.empty()
-                        st.rerun()
-                    else:
-                        st.error("Acceso denegado. Clave incorrecta.")
+            if submit_button:
+                if clave == "Juan007":
+                    st.session_state['sfx_pendiente'] = "Boton2.mp3"
+                    st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
+                    st.session_state['auth'] = True
+                    st.session_state['pagina_actual'] = 'app_garzon'
+                    st.rerun()
+                else:
+                    st.error("Acceso denegado. Clave incorrecta.")
+        
+        st.write("") 
+        if st.button("🔙 Volver al inicio"):
+            st.session_state['pagina_actual'] = 'bienvenida'
+            st.rerun()
             
-            st.write("") 
-            if st.button("🔙 Volver al inicio"):
-                st.session_state['pagina_actual'] = 'bienvenida'
-                login_placeholder.empty()
-                st.rerun()
-                
-        st.markdown("</div>", unsafe_allow_html=True)
-                
     st.stop()
 
 # PANTALLA 3: GARZÓN (MODO AUTOMÁTICO)
@@ -526,7 +603,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
             st.session_state[f"arq_subido_{st.session_state['uploader_key']}"] = True
             st.session_state['sfx_pendiente'] = "subido1.mp3"
             st.rerun()
-
     with col2:
         st.subheader(" 📂 2. Sentencias a Filtrar")
         files_comp = st.file_uploader("Sube las sentencias citadas (para incluir/excluir)", type="pdf", accept_multiple_files=True, key=f"masivo_{st.session_state['uploader_key']}")
@@ -547,173 +623,164 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
             st.session_state['analisis_terminado'] = False
             st.session_state['uploader_key'] += 1 
             st.rerun()
-            
     with col_btn1:
         ejecutar = st.button(" 🚀 EJECUTAR ANÁLISIS AUTOMÁTICO")
-        if ejecutar:
-            st.session_state['sfx_pendiente'] = "Boton1.mp3"
-            if not file_arq or not files_comp:
-                st.error("Faltan archivos para procesar.")
-            else:
-                with st.spinner("Garzón está analizando (Modo Automático)..."):
-                    ext_base = motor_juridico_final(file_arq)
-                    derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
-                    
-                    st.session_state['html_parametros'] = f"""
-                    <div class="param-box">
-                        <b style="font-size: 18px;"> 📋 REGLAS BASE EXTRAÍDAS (Sujeto, Objeto y Tema):</b><br><br>
-                        <ul>
-                            <li><b>Calidad Encontrada (Sujeto):</b> {ext_base['calidad']}</li>
-                            <li><b>Accionado Encontrado (Objeto):</b> {ext_base['accionado']}</li>
-                            <li><b>Derechos Encontrados (Tema):</b> {", ".join(ext_base['derechos'])}</li>
-                        </ul>
-                    </div>
-                    """
-                    
-                    resultados = []
-                    for f in files_comp:
-                        info = motor_juridico_final(f)
-                        estado = ""
-                        fallos = []
-                        
-                        match_calidad = (info['calidad'] == ext_base['calidad']) or (ext_base['calidad'] == "NO IDENTIFICADA (CIVIL)")
-                        if not match_calidad: fallos.append(f"Calidad difiere ({info['calidad']})")
-                            
-                        match_accionado = False
-                        if ext_base['accionado'] == "NO IDENTIFICADO":
-                            match_accionado = True
-                        else:
-                            acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
-                            acc_comp_lista = limpiar_y_separar_sujetos(info['accionado'])
-                            for a_base in acc_base_lista:
-                                for a_comp in acc_comp_lista:
-                                    siglas_base = generar_siglas(a_base)
-                                    siglas_comp = generar_siglas(a_comp)
-                                    if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
-                                       (len(siglas_base) >= 2 and siglas_base in a_comp) or \
-                                       (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
-                                       (len(siglas_base) >= 2 and siglas_base == siglas_comp):
-                                        match_accionado = True
-                                        break
-                                if match_accionado: break
-                        if not match_accionado: fallos.append(f"Accionado difiere")
-                            
-                        match_derecho = False
-                        derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
-                        if ext_base['derechos'] == ["NO IDENTIFICADO"]:
-                            match_derecho = True
-                        else:
-                            for d_base in derechos_base_limpios:
-                                if d_base == "NO IDENTIFICADO": continue
-                                for d_info in derechos_info_limpios:
-                                    if d_base in d_info or d_info in d_base:
-                                        match_derecho = True
-                                        break
-                                if match_derecho: break
-                        if not match_derecho: fallos.append("Derecho difiere")
 
-                        if not match_calidad or not match_accionado: estado = " ❌ EXCLUIDA"
-                        elif match_calidad and match_accionado and match_derecho: estado = " ✅ INCLUIDA"
-                        elif match_calidad and match_accionado and not match_derecho: estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
-                            
-                        resultados.append({
-                            "Archivo": f.name,
-                            "Accionante": info['accionante'],
-                            "Calidad Evaluada": info['calidad'],
-                            "Accionado Evaluado": info["accionado"],
-                            "Derechos Evaluados": ", ".join(info['derechos']),
-                            "Veredicto": estado,
-                            "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple todos los criterios"
-                        })
-                        
-                    st.session_state['resultados_df'] = pd.DataFrame(resultados)
-                    
-                    def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+    if ejecutar:
+        if not file_arq or not files_comp:
+            st.error("Faltan archivos para procesar.")
+        else:
+            with st.spinner("Garzón está analizando (Modo Automático)..."):
+                ext_base = motor_juridico_final(file_arq)
+                derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
+                
+                st.session_state['html_parametros'] = f"""
+                <div class="param-box">
+                    <b style="font-size: 18px;"> 📋 REGLAS BASE EXTRAÍDAS (Sujeto, Objeto y Tema):</b><br><br>
+                    <ul>
+                        <li><b>Calidad Encontrada (Sujeto):</b> {ext_base['calidad']}</li>
+                        <li><b>Entidad Accionada Encontrada (Objeto):</b> {ext_base['accionado']}</li>
+                        <li><b>Derechos Detectados (Tema):</b> {", ".join(ext_base['derechos'])}</li>
+                    </ul>
+                </div>
+                """
 
-                    pdf = FPDF()
-                    pdf.add_page()
-                    pdf.set_font("Arial", 'B', 14)
-                    pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (AUTOMATICO) - GARZON", 0, 1, 'C')
-                    pdf.set_font("Arial", '', 10)
-                    pdf.ln(5)
-                    pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA (ARQUIMÉDICA):\nSujeto (Calidad): {ext_base['calidad']}\nObjeto (Accionado): {ext_base['accionado']}\nTema (Derecho): {', '.join(ext_base['derechos'])}\n" + "="*50))
+                resultados = []
+
+                for f in files_comp:
+                    info = motor_juridico_final(f)
+                    estado = ""
+                    fallos = []
                     
-                    for r in resultados:
-                        if " ✅ " in r["Veredicto"]: pdf.set_fill_color(220, 255, 220) 
-                        elif " ⚠️ " in r["Veredicto"]: pdf.set_fill_color(255, 255, 153) 
-                        else: pdf.set_fill_color(255, 220, 220) 
+                    match_calidad = (info['calidad'] == ext_base['calidad']) or (ext_base['calidad'] == "NO IDENTIFICADA (CIVIL)")
+                    if not match_calidad:
+                        fallos.append(f"Calidad difiere ({info['calidad']})")
+                    
+                    match_accionado = False
+                    if ext_base['accionado'] == "NO IDENTIFICADO":
+                        match_accionado = True
+                    else:
+                        acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
+                        acc_comp_lista = limpiar_y_separar_sujetos(info['accionado'])
+                        for a_base in acc_base_lista:
+                            for a_comp in acc_comp_lista:
+                                siglas_base = generar_siglas(a_base)
+                                siglas_comp = generar_siglas(a_comp)
+                                if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
+                                   (len(siglas_base) >= 2 and siglas_base in a_comp) or \
+                                   (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
+                                   (len(siglas_base) >= 2 and siglas_base == siglas_comp):
+                                    match_accionado = True
+                                    break
+                            if match_accionado: break
                             
-                        pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
-                        pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
-                        pdf.ln(2)
+                    if not match_accionado:
+                        fallos.append(f"Accionado difiere")
                         
-                    try:
-                        st.session_state['pdf_binario'] = pdf.output(dest='S').encode('latin-1')
-                    except AttributeError:
-                        st.session_state['pdf_binario'] = bytes(pdf.output())
+                    match_derecho = False
+                    derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
+                    
+                    if ext_base['derechos'] == ["NO IDENTIFICADO"]:
+                        match_derecho = True
+                    else:
+                        for d_base in derechos_base_limpios:
+                            if d_base == "NO IDENTIFICADO": continue
+                            for d_info in derechos_info_limpios:
+                                if d_base in d_info or d_info in d_base:
+                                    match_derecho = True
+                                    break
+                            if match_derecho: break
+                            
+                        if not match_derecho:
+                            fallos.append("Derecho difiere")
+
+                    if not match_calidad or not match_accionado: estado = " ❌ EXCLUIDA"
+                    elif match_calidad and match_accionado and match_derecho: estado = " ✅ INCLUIDA"
+                    elif match_calidad and match_accionado and not match_derecho: estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
                         
-                    st.session_state['analisis_terminado'] = True
+                    resultados.append({
+                        "Archivo": f.name,
+                        "Accionante": info['accionante'],
+                        "Calidad Evaluada": info['calidad'],
+                        "Accionado Evaluado": info["accionado"],
+                        "Derechos Evaluados": ", ".join(info['derechos']),
+                        "Veredicto": estado,
+                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple todos los criterios"
+                    })
+                
+                st.session_state['resultados_df'] = pd.DataFrame(resultados)
+                
+                def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 14)
+                pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (AUTOMATICO) - GARZON", 0, 1, 'C')
+                pdf.set_font("Arial", '', 10)
+                pdf.ln(5)
+                pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA (ARQUIMÉDICA):\nSujeto (Calidad): {ext_base['calidad']}\nObjeto (Accionado): {ext_base['accionado']}\nTema (Derecho): {', '.join(ext_base['derechos'])}\n" + "="*50))
+                
+                for r in resultados:
+                    if " ✅ " in r["Veredicto"]: pdf.set_fill_color(220, 255, 220)
+                    elif " ⚠️ " in r["Veredicto"]: pdf.set_fill_color(255, 255, 153)
+                    else: pdf.set_fill_color(255, 220, 220)
+                        
+                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
+                    pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
+                    pdf.ln(2)
+
+                try: st.session_state['pdf_binario'] = pdf.output(dest='S').encode('latin-1')
+                except AttributeError: st.session_state['pdf_binario'] = bytes(pdf.output())
+                    
+                st.session_state['analisis_terminado'] = True
 
     if st.session_state['analisis_terminado']:
         st.markdown(st.session_state['html_parametros'], unsafe_allow_html=True)
-        st.dataframe(st.session_state['resultados_df'].style.applymap(highlight_veredicto, subset=['Veredicto']), use_container_width=True)
-        
+        st.dataframe(st.session_state['resultados_df'].style.applymap(highlight_veredicto, subset=['Veredicto']))
         st.download_button(
-            label=" 📥 DESCARGAR INFORME EN PDF",
-            data=st.session_state['pdf_binario'],
+            label=" 📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
+            data=st.session_state['pdf_binario'], 
             file_name="Reporte_Ingenieria_Inversa.pdf",
             mime="application/pdf"
         )
-        
     st.stop()
 
 # PANTALLA 4: GARZÓN (MODO GUIADO)
 elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state['auth']:
     st.markdown("<div class='main-title'>GARZÓN - MODO GUIADO (INGRESO MANUAL DE PARÁMETROS)</div>", unsafe_allow_html=True)
-    
     if st.button(" 🔙 Volver al Modo Automático"):
         st.session_state['pagina_actual'] = 'app_garzon'
         st.rerun()
         
     st.write("---")
-    
     st.subheader(" 📝 1. Ingresa tu Escenario y Tema Jurídico")
     st.info("Llena los campos definidos. Garzón los usará como 'Regla Única' y evaluará el cumplimiento de los 3 Criterios (Sujeto, Objeto, Derecho).")
-
+    
     st.markdown("<b> 👤 Datos del Accionante (Quien demanda):</b>", unsafe_allow_html=True)
     col_u1, col_u2, col_u3 = st.columns(3)
-    with col_u1:
-        u_accionante = st.text_input("Nombre (Ej: Juan Pérez)")
+    with col_u1: u_accionante = st.text_input("Nombre (Ej: Juan Pérez)")
     with col_u2:
         opts_calidad = ["No aplica", "Periodista/Comunicador social", "Docente", "Funcionario público", "Civil", "Otro"]
         u_calidad_sel = st.selectbox("Calidad del Accionante", opts_calidad)
     with col_u3:
         u_calidad = ""
-        if u_calidad_sel == "Otro":
-            u_calidad = st.text_input("Especifique la calidad:")
-        elif u_calidad_sel != "No aplica":
+        if u_calidad_sel == "Otro": u_calidad = st.text_input("Especifique la calidad:")
+        elif u_calidad_sel != "No aplica": 
             u_calidad = u_calidad_sel
-        if u_calidad == "Periodista/Comunicador social": u_calidad = "PERIODISTA"
-
+            if u_calidad == "Periodista/Comunicador social": u_calidad = "PERIODISTA"
+                
     st.markdown("<br><b> 🏢 Datos del Accionado (Quien vulnera el derecho):</b>", unsafe_allow_html=True)
     col_a1, col_a2, col_a3 = st.columns(3)
-    with col_a1:
-        u_accionado_nombre = st.text_input("Nombre / Particular (Ej: Carlos Gómez)")
-    with col_a2:
-        u_accionado_calidad = st.text_input("Cargo / Calidad (Ej: Alcalde, Gerente)")
-    with col_a3:
-        u_accionado_entidad = st.text_input("Entidad vinculada (Ej: Ministerio, UNP)")
+    with col_a1: u_accionado_nombre = st.text_input("Nombre / Particular (Ej: Carlos Gómez)")
+    with col_a2: u_accionado_calidad = st.text_input("Cargo / Calidad (Ej: Alcalde, Gerente)")
+    with col_a3: u_accionado_entidad = st.text_input("Entidad vinculada (Ej: Ministerio, UNP)")
 
     st.markdown("<br><b> ⚖️ Datos del Derecho Vulnerado (Tema):</b>", unsafe_allow_html=True)
     col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        u_derecho_sel = st.selectbox("Seleccione el Derecho Fundamental principal:", LISTA_DERECHOS)
+    with col_d1: u_derecho_sel = st.selectbox("Seleccione el Derecho Fundamental principal:", LISTA_DERECHOS)
     with col_d2:
         u_derecho = ""
-        if u_derecho_sel == "Otro":
-            u_derecho = st.text_input("Especifique el derecho:")
-        elif u_derecho_sel != "No aplica":
-            u_derecho = u_derecho_sel
+        if u_derecho_sel == "Otro": u_derecho = st.text_input("Especifique el derecho:")
+        elif u_derecho_sel != "No aplica": u_derecho = u_derecho_sel
 
     st.write("---")
 
@@ -725,7 +792,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
             st.session_state[f"arq_g_subido_{st.session_state['uploader_key']}"] = True
             st.session_state['sfx_pendiente'] = "subido1.mp3"
             st.rerun()
-
     with col2:
         st.subheader(" 📂 3. Sentencias a Filtrar")
         files_comp_g = st.file_uploader("Sube los PDFs citados", type="pdf", accept_multiple_files=True, key=f"masivo_g_{st.session_state['uploader_key']}")
@@ -737,190 +803,237 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
     if 'analisis_terminado_g' not in st.session_state:
         st.session_state['analisis_terminado_g'] = False
         st.session_state['resultados_df_g'] = None
-        st.session_state['pdf_binario_g'] = None
         st.session_state['html_parametros_g'] = ""
+        st.session_state['pdf_binario_g'] = None
 
-    col_btn1_g, col_btn2_g = st.columns(2)
-    with col_btn2_g:
-        if st.button(" 🧹 LIMPIAR DATOS", key="limpiar_g"):
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn2:
+        if st.button(" 🧹 LIMPIAR DATOS"):
             st.session_state['analisis_terminado_g'] = False
             st.session_state['uploader_key'] += 1 
             st.rerun()
+            
+    with col_btn1:
+        ejecutar_g = st.button(" 🚀 EJECUTAR ANÁLISIS GUIADO (Sujeto + Objeto + Derecho)")
 
-    with col_btn1_g:
-        ejecutar_g = st.button(" 🚀 EJECUTAR ANÁLISIS GUIADO", key="exec_g")
-        if ejecutar_g:
-            st.session_state['sfx_pendiente'] = "Boton1.mp3"
-            if not file_arq_g or not files_comp_g:
-                st.error("Faltan archivos para procesar.")
-            else:
-                with st.spinner("Garzón está fusionando parámetros e IA..."):
-                    ext_base = motor_juridico_final(file_arq_g)
-                    
-                    param_u_cal = limpiar_texto_usuario(u_calidad)
-                    param_u_acc = limpiar_texto_usuario(u_accionante)
-                    param_u_der = limpiar_texto_usuario(u_derecho)
-                    partes_accionado_u = [limpiar_texto_usuario(x) for x in [u_accionado_nombre, u_accionado_calidad, u_accionado_entidad] if limpiar_texto_usuario(x)]
+    if ejecutar_g:
+        if not file_arq_g or not files_comp_g:
+            st.error("Faltan archivos para procesar.")
+        else:
+            with st.spinner("Garzón está interpretando tus parámetros y buscando en los expedientes..."):
+                ext_base = motor_juridico_final(file_arq_g)
+                
+                param_u_cal = limpiar_texto_usuario(u_calidad)
+                param_u_acc = limpiar_texto_usuario(u_accionante)
+                param_u_der = limpiar_texto_usuario(u_derecho)
+                partes_accionado_u = [limpiar_texto_usuario(x) for x in [u_accionado_nombre, u_accionado_calidad, u_accionado_entidad] if limpiar_texto_usuario(x)]
+                
+                # --- SISTEMA DE ALERTAS Y PRIORIDAD A LA ARQUIMÉDICA ---
+                alertas = []
+                
+                final_calidad = ext_base['calidad']
+                usar_calidad_usuario = False
+                if param_u_cal and param_u_cal not in ["NO APLICA", "OTRO"]:
+                    if param_u_cal in ext_base['calidad'] or ext_base['calidad'] in param_u_cal:
+                        usar_calidad_usuario = True
+                        final_calidad = param_u_cal
+                    else:
+                        alertas.append(f"La calidad (<b>{u_calidad}</b>) no coincide. Daré prioridad a: <b>{ext_base['calidad']}</b>")
 
-                    final_calidad = param_u_cal if param_u_cal else ext_base['calidad']
-                    final_accionante = param_u_acc if param_u_acc else ext_base['accionante']
-                    final_accionado_display = " | ".join(partes_accionado_u) if partes_accionado_u else ext_base['accionado']
-                    
-                    derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
-                    
-                    alerta_derecho = ""
-                    if param_u_der and param_u_der != "NO APLICA":
-                        encontrado = False
-                        for d_base in derechos_base_limpios:
-                            if param_u_der in d_base or d_base in param_u_der:
-                                encontrado = True
-                                break
-                        if not encontrado:
-                            alerta_derecho = f"<div style='margin-top: 15px; padding: 10px; background-color: #ffeeba; border-left: 5px solid #ffc107; color: #856404;'><b> ⚠️ ¡Atención!</b> Tu derecho guía ({u_derecho}) no se encontró en la sentencia Arquimédica. Sin embargo, Garzón logró identificar los siguientes y les dará mayor peso: <b>{', '.join(ext_base['derechos'])}</b></div>"
-                            
-                    final_derecho_display = ", ".join(ext_base['derechos'])
-                    if param_u_der and param_u_der != "NO APLICA":
+                final_accionado_display = ext_base['accionado']
+                usar_accionado_usuario = False
+                if partes_accionado_u:
+                    encontrado_acc = False
+                    for parte in partes_accionado_u:
+                        if parte in ext_base['accionado'] or ext_base['accionado'] in parte:
+                            encontrado_acc = True
+                            break
+                        sigla_parte = generar_siglas(parte)
+                        if len(sigla_parte) >= 2 and sigla_parte in ext_base['accionado']:
+                            encontrado_acc = True
+                            break
+                    if encontrado_acc:
+                        usar_accionado_usuario = True
+                        final_accionado_display = " | ".join(partes_accionado_u)
+                    else:
+                        alertas.append(f"El accionado (<b>{' | '.join(partes_accionado_u)}</b>) no coincide. Daré prioridad a: <b>{ext_base['accionado']}</b>")
+
+                final_derecho_display = ", ".join(ext_base['derechos'])
+                usar_derecho_usuario = False
+                derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
+                
+                if param_u_der and param_u_der != "NO APLICA":
+                    encontrado_der = False
+                    for d_base in derechos_base_limpios:
+                        if param_u_der in d_base or d_base in param_u_der:
+                            encontrado_der = True
+                            break
+                    if encontrado_der:
+                        usar_derecho_usuario = True
                         final_derecho_display += f" <br><small>(Guía del usuario: {u_derecho})</small>"
+                    else:
+                        alertas.append(f"El derecho (<b>{u_derecho}</b>) no se encontró. Daré prioridad a: <b>{', '.join(ext_base['derechos'])}</b>")
 
-                    st.session_state['html_parametros_g'] = f"""
-                    <div class="param-box">
-                        <b style="font-size: 18px;"> 🧠 4TO FILTRO (FUSIÓN SUJETO - OBJETO - TEMA):</b><br><br>
-                        <table style="width:100%; text-align:left; border-collapse: collapse;">
-                            <tr>
-                                <th style="border-bottom: 1px solid black; padding: 5px;">Criterio Evaluado</th>
-                                <th style="border-bottom: 1px solid black; padding: 5px;">Sugerencia IA (Arquimédica)</th>
-                                <th style="border-bottom: 1px solid black; padding: 5px; color: green;">REGLA ÚNICA A BUSCAR</th>
-                            </tr>
-                            <tr>
-                                <td style="padding: 5px;"><b>1. Calidad (Sujeto)</b></td>
-                                <td style="padding: 5px;">{ext_base['calidad']}</td>
-                                <td style="padding: 5px; color: green;"><b>{final_calidad}</b></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 5px;"><b>2. Accionado (Objeto)</b></td>
-                                <td style="padding: 5px;">{ext_base['accionado']}</td>
-                                <td style="padding: 5px; color: green;"><b>{final_accionado_display}</b></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 5px;"><b>3. Derecho (Tema)</b></td>
-                                <td style="padding: 5px;">{", ".join(ext_base['derechos'])}</td>
-                                <td style="padding: 5px; color: green;"><b>{final_derecho_display}</b></td>
-                            </tr>
-                        </table>
-                        {alerta_derecho}
-                    </div>
-                    """
+                html_alertas = ""
+                if alertas:
+                    html_alertas = "<div style='margin-top: 15px; padding: 10px; background-color: #ffeeba; border-left: 5px solid #ffc107; color: #856404; font-size: 14px;'><b>⚠️ ¡Atención! Algunas de tus guías no fueron halladas en la Sentencia Arquimédica. He dado prioridad al documento original:</b><ul style='margin-top: 5px;'>"
+                    for alerta in alertas:
+                        html_alertas += f"<li>{alerta}</li>"
+                    html_alertas += "</ul></div>"
+                
+                st.session_state['html_parametros_g'] = f"""
+                <div class="param-box">
+                    <b style="font-size: 18px;"> 🧠 4TO FILTRO (FUSIÓN SUJETO - OBJETO - TEMA):</b><br><br>
+                    <table style="width:100%; text-align:left; border-collapse: collapse;">
+                      <tr>
+                        <th style="border-bottom: 1px solid black; padding: 5px;">Criterio Evaluado</th>
+                        <th style="border-bottom: 1px solid black; padding: 5px;">Sugerencia IA (Arquimédica)</th>
+                        <th style="border-bottom: 1px solid black; padding: 5px; color: green;">REGLA ÚNICA A BUSCAR</th>
+                      </tr>
+                      <tr>
+                        <td style="padding: 5px;"><b>1. Calidad (Sujeto)</b></td>
+                        <td style="padding: 5px;">{ext_base['calidad']}</td>
+                        <td style="padding: 5px; color: green;"><b>{final_calidad}</b></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 5px;"><b>2. Accionado (Objeto)</b></td>
+                        <td style="padding: 5px;">{ext_base['accionado']}</td>
+                        <td style="padding: 5px; color: green;"><b>{final_accionado_display}</b></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 5px;"><b>3. Derecho (Tema)</b></td>
+                        <td style="padding: 5px;">{", ".join(ext_base['derechos'])}</td>
+                        <td style="padding: 5px; color: green;"><b>{final_derecho_display}</b></td>
+                      </tr>
+                    </table>
+                    {html_alertas}
+                </div>
+                """
+
+                resultados = []
+
+                for f in files_comp_g:
+                    info = motor_juridico_final(f)
+                    fallos = []
                     
-                    resultados = []
-                    for f in files_comp_g:
-                        info = motor_juridico_final(f)
-                        estado = ""
-                        fallos = []
-
-                        match_calidad = (info['calidad'] == final_calidad) or (final_calidad == "NO IDENTIFICADA (CIVIL)")
-                        if not match_calidad: fallos.append(f"Calidad difiere ({info['calidad']})")
-
-                        match_accionado = False
-                        acc_comp_lista = limpiar_y_separar_sujetos(info['accionado'])
-                        
-                        if partes_accionado_u:
-                            for parte in partes_accionado_u:
+                    match_calidad = False
+                    calidad_limpia_info = limpiar_texto_usuario(info['calidad'])
+                    calidad_limpia_final = limpiar_texto_usuario(final_calidad)
+                    if calidad_limpia_final in calidad_limpia_info or calidad_limpia_info in calidad_limpia_final or final_calidad == "NO IDENTIFICADA (CIVIL)":
+                        match_calidad = True
+                    else:
+                        fallos.append(f"Calidad difiere ({info['calidad']})")
+                    
+                    match_accionado = False
+                    acc_comp_lista = limpiar_y_separar_sujetos(info["accionado"])
+                    
+                    if usar_accionado_usuario:
+                        for parte in partes_accionado_u:
+                            parte_limpia = limpiar_texto_usuario(parte)
+                            if len(parte_limpia) > 2:
+                                sigla_parte = generar_siglas(parte_limpia)
                                 for a_comp in acc_comp_lista:
-                                    if len(parte) > 2 and parte in a_comp:
+                                    siglas_comp = generar_siglas(a_comp)
+                                    if parte_limpia in a_comp or a_comp in parte_limpia or \
+                                       (len(sigla_parte) >= 2 and sigla_parte in a_comp) or \
+                                       (len(siglas_comp) >= 2 and siglas_comp in parte_limpia):
+                                        match_accionado = True
+                                        break
+                            if match_accionado: break
+                    else:
+                        if ext_base['accionado'] == "NO IDENTIFICADO":
+                            match_accionado = True
+                        else:
+                            acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
+                            for a_base in acc_base_lista:
+                                for a_comp in acc_comp_lista:
+                                    siglas_base = generar_siglas(a_base)
+                                    siglas_comp = generar_siglas(a_comp)
+                                    if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
+                                       (len(siglas_base) >= 2 and siglas_base in a_comp) or \
+                                       (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
+                                       (len(siglas_base) >= 2 and siglas_base == siglas_comp):
                                         match_accionado = True
                                         break
                                 if match_accionado: break
-                        else:
-                            if ext_base['accionado'] == "NO IDENTIFICADO": match_accionado = True
-                            else:
-                                acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
-                                for a_base in acc_base_lista:
-                                    for a_comp in acc_comp_lista:
-                                        siglas_base = generar_siglas(a_base)
-                                        siglas_comp = generar_siglas(a_comp)
-                                        if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
-                                           (len(siglas_base) >= 2 and siglas_base in a_comp) or \
-                                           (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
-                                           (len(siglas_base) >= 2 and siglas_base == siglas_comp):
-                                            match_accionado = True
-                                            break
-                                    if match_accionado: break
-                                    
-                        if not match_accionado: fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
-
-                        match_derecho = False
-                        derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
-                        
-                        if ext_base['derechos'] == ["NO IDENTIFICADO"] and (not param_u_der or param_u_der == "NO APLICA"):
-                            match_derecho = True
-                        else:
-                            for d_base in derechos_base_limpios:
-                                if d_base == "NO IDENTIFICADO": continue
-                                for d_info in derechos_info_limpios:
-                                    if d_base in d_info or d_info in d_base:
-                                        match_derecho = True
-                                        break
-                                if match_derecho: break
-                                
-                            if not match_derecho and param_u_der and param_u_der != "NO APLICA":
-                                for d_info in derechos_info_limpios:
-                                    if param_u_der in d_info or d_info in param_u_der:
-                                        match_derecho = True
-                                        break
-                                        
-                        if not match_derecho: fallos.append("Derecho difiere")
-
-                        if not match_calidad or not match_accionado: estado = " ❌ EXCLUIDA"
-                        elif match_calidad and match_accionado and match_derecho: estado = " ✅ INCLUIDA"
-                        elif match_calidad and match_accionado and not match_derecho: estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
-
-                        resultados.append({
-                            "Archivo": f.name,
-                            "Accionante": info['accionante'],
-                            "Calidad Evaluada": info['calidad'],
-                            "Accionado Evaluado": info["accionado"],
-                            "Derechos Evaluados": ", ".join(info['derechos']),
-                            "Veredicto": estado,
-                            "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple todos los criterios"
-                        })
-                        
-                    st.session_state['resultados_df_g'] = pd.DataFrame(resultados)
-                    
-                    def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
-
-                    pdf = FPDF()
-                    pdf.add_page()
-                    pdf.set_font("Arial", 'B', 14)
-                    pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (GUIADO) - GARZON", 0, 1, 'C')
-                    pdf.set_font("Arial", '', 10)
-                    pdf.ln(5)
-                    pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA:\nSujeto (Calidad): {final_calidad}\nObjeto (Accionado): {final_accionado_display}\nTema (Derecho): {final_derecho_display}\n" + "="*50))
-                    
-                    for r in resultados:
-                        if " ✅ " in r["Veredicto"]: pdf.set_fill_color(220, 255, 220) 
-                        elif " ⚠️ " in r["Veredicto"]: pdf.set_fill_color(255, 255, 153) 
-                        else: pdf.set_fill_color(255, 220, 220) 
                             
-                        pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
-                        pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
-                        pdf.ln(2)
+                    if not match_accionado:
+                        fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
                         
-                    try:
-                        st.session_state['pdf_binario_g'] = pdf.output(dest='S').encode('latin-1')
-                    except AttributeError:
-                        st.session_state['pdf_binario_g'] = bytes(pdf.output())
+                    match_derecho = False
+                    derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
+                    
+                    if ext_base['derechos'] == ["NO IDENTIFICADO"] and not usar_derecho_usuario:
+                        match_derecho = True
+                    else:
+                        for d_base in derechos_base_limpios:
+                            if d_base == "NO IDENTIFICADO": continue
+                            for d_info in derechos_info_limpios:
+                                if d_base in d_info or d_info in d_base:
+                                    match_derecho = True
+                                    break
+                            if match_derecho: break
                         
-                    st.session_state['analisis_terminado_g'] = True
+                        if not match_derecho and usar_derecho_usuario:
+                            for d_info in derechos_info_limpios:
+                                if param_u_der in d_info or d_info in param_u_der:
+                                    match_derecho = True
+                                    break
+
+                        if not match_derecho:
+                            fallos.append("Derecho difiere")
+
+                    if not match_calidad or not match_accionado:
+                        estado = " ❌ EXCLUIDA"
+                    elif match_calidad and match_accionado and match_derecho:
+                        estado = " ✅ INCLUIDA"
+                    elif match_calidad and match_accionado and not match_derecho:
+                        estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
+                        
+                    resultados.append({
+                        "Archivo": f.name,
+                        "Accionante": info['accionante'],
+                        "Calidad Evaluada": info['calidad'],
+                        "Accionado Evaluado": info["accionado"],
+                        "Derechos Evaluados": ", ".join(info['derechos']),
+                        "Veredicto": estado,
+                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple todos los criterios"
+                    })
+                
+                st.session_state['resultados_df_g'] = pd.DataFrame(resultados)
+                
+                def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 14)
+                pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (GUIADO) - GARZON", 0, 1, 'C')
+                pdf.set_font("Arial", '', 10)
+                pdf.ln(5)
+                pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA:\nSujeto (Calidad): {final_calidad}\nObjeto (Accionado): {final_accionado_display}\nTema (Derecho): {final_derecho_display.replace('<br><small>','').replace('</small>','')}\n" + "="*50))
+                
+                for r in resultados:
+                    if " ✅ " in r["Veredicto"]: pdf.set_fill_color(220, 255, 220) 
+                    elif " ⚠️ " in r["Veredicto"]: pdf.set_fill_color(255, 255, 153) 
+                    else: pdf.set_fill_color(255, 220, 220) 
+                        
+                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
+                    pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
+                    pdf.ln(2)
+                    
+                try:
+                    st.session_state['pdf_binario_g'] = pdf.output(dest='S').encode('latin-1')
+                except AttributeError:
+                    st.session_state['pdf_binario_g'] = bytes(pdf.output())
+                    
+                st.session_state['analisis_terminado_g'] = True
 
     if st.session_state['analisis_terminado_g']:
         st.markdown(st.session_state['html_parametros_g'], unsafe_allow_html=True)
-        st.dataframe(st.session_state['resultados_df_g'].style.applymap(highlight_veredicto, subset=['Veredicto']), use_container_width=True)
+        st.dataframe(st.session_state['resultados_df_g'].style.applymap(highlight_veredicto, subset=['Veredicto']))
         
         st.download_button(
-            label=" 📥 DESCARGAR INFORME EN PDF",
-            data=st.session_state['pdf_binario_g'],
-            file_name="Reporte_Ingenieria_Inversa_Guiado.pdf",
+            label=" 📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
+            data=st.session_state['pdf_binario_g'], 
+            file_name="reporte_guiado_linea_jurisprudencial.pdf",
             mime="application/pdf"
         )
-        
-    st.stop()
