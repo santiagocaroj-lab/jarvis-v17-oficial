@@ -84,22 +84,7 @@ st.markdown("""
     
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
     
-    /* El contenedor maestro de Streamlit se vuelve la referencia (relative) */
-    div[data-testid="stAppViewBlockContainer"] { position: relative; }
-    
-    /* Al anclarlo en left: 68%, se mueve en perfecta sincronía con el bloque central al abrir el panel */
-    .login-img-container { 
-        position: absolute; 
-        bottom: 0px; 
-        left: 68%; 
-        height: 80vh; 
-        width: auto; 
-        object-fit: contain; 
-        opacity: 0; 
-        animation: fadeIn 1.2s ease 0.1s forwards; 
-        z-index: 999; 
-        pointer-events: none; 
-    }
+    .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0; animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
     
     /* Estilos para centrar la barra de carga */
     .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
@@ -184,7 +169,6 @@ def renderizar_gestor_audio():
         if (sfxStr && !silenciado) {{
             let sfxAudio = new Audio("data:audio/mp3;base64," + sfxStr);
             sfxAudio.volume = 0.8;
-            sfxAudio.currentTime = 0.25; // Salta 0.25 seg. para eliminar el silencio inicial del mp3
             sfxAudio.play().catch(e => console.log("Autoplay SFX bloqueado"));
         }}
     }} catch (error) {{
@@ -380,108 +364,97 @@ def motor_juridico_final(pdf_file):
     return {"accionante": accionante, "calidad": calidad, "accionado": accionado, "derechos": derechos_finales}
 
 # =====================================================================
-# RUTEO DE PANTALLAS ESTRICTO CON PROTECCIÓN GHOSTING
+# RUTEO DE PANTALLAS ESTRICTO
 # =====================================================================
 
 # PANTALLA 1: BIENVENIDA (ECOMODA)
 if st.session_state['pagina_actual'] == 'bienvenida':
-    bienvenida_placeholder = st.empty() # Contenedor destructible
-    
-    with bienvenida_placeholder.container():
-        img_html = ""
-        if img_logo_b64:
-            img_html = f"<img src='data:image/png;base64,{img_logo_b64}' width='140' style='border-radius: 10px;'>"
-        st.markdown(f"""
-        <div class='welcome-wrapper'>
-            {img_html}
-            <div class='ecomoda-header'>Ecomoda - Servidor Jurídico</div>
-            <div class='welcome-title'>Análisis Jurisprudencial para Periodistas</div>
-            <div class='welcome-subtitle'>
-                Descubre las líneas jurisprudenciales clave de la Corte Constitucional mediante nuestro motor de inteligencia artificial <b>'Garzón'</b>.
-            </div>
+    img_html = ""
+    if img_logo_b64:
+        img_html = f"<img src='data:image/png;base64,{img_logo_b64}' width='140' style='border-radius: 10px;'>"
+    st.markdown(f"""
+    <div class='welcome-wrapper'>
+        {img_html}
+        <div class='ecomoda-header'>Ecomoda - Servidor Jurídico</div>
+        <div class='welcome-title'>Análisis Jurisprudencial para Periodistas</div>
+        <div class='welcome-subtitle'>
+            Descubre las líneas jurisprudenciales clave de la Corte Constitucional mediante nuestro motor de inteligencia artificial <b>'Garzón'</b>.
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button(" 🚀  INGRESAR AL SISTEMA"):
-                st.session_state['musica_activa'] = True
-                st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
-                st.session_state['sfx_pendiente'] = "Boton1.mp3"
-                st.session_state['pagina_actual'] = 'cargando'
-                bienvenida_placeholder.empty() # Destruye toda la pantalla ANTES de recargar
-                st.rerun()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button(" 🚀  INGRESAR AL SISTEMA"):
+            st.session_state['musica_activa'] = True
+            st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
+            st.session_state['sfx_pendiente'] = "Boton1.mp3"
+            st.session_state['pagina_actual'] = 'cargando'
+            st.rerun()
 
-        st.markdown("""
-            <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
-                📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
-            </a>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
+            📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
+        </a>
+    """, unsafe_allow_html=True)
     
-    st.stop()
+    st.stop() # Bloqueo absoluto, nada de esto pasará a la carga
 
 # PANTALLA INTERMEDIA: LÍNEA DE CARGA
 elif st.session_state['pagina_actual'] == 'cargando':
-    cargando_placeholder = st.empty()
-    
-    with cargando_placeholder.container():
-        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1])
+    st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-        with col2:
-            mensajes_carga = [
-                "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
-                "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
-                "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico  ☕ ...", "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial..."
-            ]
-            mensaje_actual = random.choice(mensajes_carga)
-            st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
-            barra_carga = st.progress(0)
-            for porcentaje in range(100):
-                time.sleep(0.015)
-                barra_carga.progress(porcentaje + 1)
-                
-    cargando_placeholder.empty() # Destruye la carga antes de ir al login
-    st.session_state['pagina_actual'] = 'login'
-    st.rerun()
+    with col2:
+        mensajes_carga = [
+            "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
+            "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
+            "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico  ☕ ...", "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial..."
+        ]
+        mensaje_actual = random.choice(mensajes_carga)
+        st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
+        barra_carga = st.progress(0)
+        for porcentaje in range(100):
+            time.sleep(0.015)
+            barra_carga.progress(porcentaje + 1)
+            
+        st.session_state['pagina_actual'] = 'login'
+        st.rerun()
+        
+    st.stop()
 
 # PANTALLA 2: FIREWALL DE SEGURIDAD (LOGIN)
 elif st.session_state['pagina_actual'] == 'login':
-    login_placeholder = st.empty()
+    st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     
-    with login_placeholder.container():
-        st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
-        
-        if img_login_b64:
-            st.markdown(f"""
-                <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
-                """, unsafe_allow_html=True)
+    if img_login_b64:
+        st.markdown(f"""
+            <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
+            """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.info("Por favor, identifícate para acceder al motor de análisis.")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.info("Por favor, identifícate para acceder al motor de análisis.")
+        
+        with st.form(key='login_form', clear_on_submit=False):
+            clave = st.text_input("Ingrese la clave de seguridad:", type="password")
+            submit_button = st.form_submit_button("INGRESAR")
             
-            with st.form(key='login_form', clear_on_submit=False):
-                clave = st.text_input("Ingrese la clave de seguridad:", type="password")
-                submit_button = st.form_submit_button("INGRESAR")
-                
-                if submit_button:
-                    if clave == "Juan007":
-                        st.session_state['sfx_pendiente'] = "Boton2.mp3"
-                        st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
-                        st.session_state['auth'] = True
-                        st.session_state['pagina_actual'] = 'app_garzon'
-                        login_placeholder.empty()
-                        st.rerun()
-                    else:
-                        st.error("Acceso denegado. Clave incorrecta.")
+            if submit_button:
+                if clave == "Juan007":
+                    st.session_state['sfx_pendiente'] = "Boton2.mp3"
+                    st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
+                    st.session_state['auth'] = True
+                    st.session_state['pagina_actual'] = 'app_garzon'
+                    st.rerun()
+                else:
+                    st.error("Acceso denegado. Clave incorrecta.")
+        
+        st.write("") 
+        if st.button("🔙 Volver al inicio"):
+            st.session_state['pagina_actual'] = 'bienvenida'
+            st.rerun()
             
-            st.write("") 
-            if st.button("🔙 Volver al inicio"):
-                st.session_state['pagina_actual'] = 'bienvenida'
-                login_placeholder.empty()
-                st.rerun()
-                
     st.stop()
 
 # PANTALLA 3: GARZÓN (MODO AUTOMÁTICO)
