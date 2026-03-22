@@ -86,9 +86,6 @@ st.markdown("""
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
     
     .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0; animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
-    
-    /* Estilos para centrar la barra de carga */
-    .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -137,7 +134,6 @@ def renderizar_gestor_audio():
         const doc = window.parent.document;
         const silenciado = {str(silenciado).lower()};
         
-        // --- MÚSICA DE FONDO ---
         let bgAudio = doc.getElementById('ecomoda-bg-music');
         if (!bgAudio) {{
             bgAudio = doc.createElement('audio');
@@ -165,7 +161,6 @@ def renderizar_gestor_audio():
             }}
         }}
         
-        // --- EFECTOS DE SONIDO ---
         const sfxStr = "{sfx_b64}";
         if (sfxStr && !silenciado) {{
             let sfxAudio = new Audio("data:audio/mp3;base64," + sfxStr);
@@ -203,9 +198,7 @@ def highlight_veredicto(val):
 
 def limpiar_y_separar_sujetos(texto):
     texto_limpio = limpiar_texto_usuario(texto)
-    # Quitamos los tags [T-XXXX]
     texto_limpio = re.sub(r'\[T[-\w\.]+\]\s*', '', texto_limpio)
-    # Cortamos por comas, " Y ", " E ", o " | "
     sujetos = re.split(r'\s+Y\s+|\s+E\s+|,|\|', texto_limpio)
     return [s.strip() for s in sujetos if len(s.strip()) > 3]
 
@@ -221,9 +214,6 @@ def motor_juridico_final(pdf_file):
     
     texto_limpio = re.sub(r'\s+', ' ', texto_acumulado)
     
-    # ---------------------------------------------------------
-    # DETECCIÓN DE MÚLTIPLES EXPEDIENTES (ACUMULACIÓN)
-    # ---------------------------------------------------------
     expedientes = []
     es_multiple = False
     
@@ -243,7 +233,6 @@ def motor_juridico_final(pdf_file):
         except:
             pass
 
-    # A. EXTRACCIÓN ACCIONANTE Y ACCIONADO
     accionantes_lista = []
     accionados_lista = []
 
@@ -259,7 +248,6 @@ def motor_juridico_final(pdf_file):
                 
                 if "contra" in caso_limpio.lower() or "frente a" in caso_limpio.lower():
                     m_pair = re.search(r"([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)\s+(?:contra|en contra de|frente a)\s+(?:la\s+|el\s+|los\s+|las\s+)?([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{3,150}?)(?=$|para\s|a fin de\s)", caso_limpio, re.IGNORECASE)
-                    
                     if m_pair:
                         acc = m_pair.group(1).strip().upper()
                         ado = m_pair.group(2).strip().upper()
@@ -457,7 +445,13 @@ if st.session_state['pagina_actual'] == 'bienvenida':
             st.session_state['pagina_actual'] = 'cargando'
             st.rerun()
 
-    st.stop() 
+        st.markdown("""
+            <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
+                📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
+            </a>
+        """, unsafe_allow_html=True)
+    
+    st.stop()
 
 # PANTALLA INTERMEDIA: LÍNEA DE CARGA
 elif st.session_state['pagina_actual'] == 'cargando':
@@ -474,16 +468,8 @@ elif st.session_state['pagina_actual'] == 'cargando':
         st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
         barra_carga = st.progress(0)
         
-        st.markdown("""
-            <div style='margin-top: 30px; text-align: center;'>
-                <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
-                    📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
-                </a>
-            </div>
-        """, unsafe_allow_html=True)
-
         for porcentaje in range(100):
-            time.sleep(0.03) # Pausa total de ~3 segundos para que alcancen a ver el enlace
+            time.sleep(0.015) 
             barra_carga.progress(porcentaje + 1)
             
         st.session_state['pagina_actual'] = 'login'
@@ -784,23 +770,20 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                 param_u_der = limpiar_texto_usuario(u_derecho)
                 partes_accionado_u = [limpiar_texto_usuario(x) for x in [u_accionado_nombre, u_accionado_calidad, u_accionado_entidad] if limpiar_texto_usuario(x)]
                 
-                final_calidad = param_u_cal if param_u_cal else ext_base['calidad']
-                final_accionante = param_u_acc if param_u_acc else ext_base['accionante']
-                final_accionado_display = " | ".join(partes_accionado_u) if partes_accionado_u else ext_base['accionado']
-                
-                derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
-
-                # -----------------------------------------------
-                # 4TO FILTRO: ALERTAS DE DISCREPANCIA (HUMANO VS IA)
-                # -----------------------------------------------
+                # --- SISTEMA DE ALERTAS Y PRIORIDAD A LA ARQUIMÉDICA ---
                 alertas = []
                 
-                if param_u_acc and param_u_acc not in ext_base['accionante'] and ext_base['accionante'] not in param_u_acc:
-                    alertas.append(f"El accionante (<b>{u_accionante}</b>) no coincide. Encontré: <b>{ext_base['accionante']}</b>")
-                
-                if param_u_cal and param_u_cal not in ["NO APLICA", "OTRO"] and param_u_cal not in ext_base['calidad'] and ext_base['calidad'] not in param_u_cal:
-                    alertas.append(f"La calidad (<b>{u_calidad}</b>) no coincide. Encontré: <b>{ext_base['calidad']}</b>")
-                
+                final_calidad = ext_base['calidad']
+                usar_calidad_usuario = False
+                if param_u_cal and param_u_cal not in ["NO APLICA", "OTRO"]:
+                    if param_u_cal in ext_base['calidad'] or ext_base['calidad'] in param_u_cal:
+                        usar_calidad_usuario = True
+                        final_calidad = param_u_cal
+                    else:
+                        alertas.append(f"La calidad (<b>{u_calidad}</b>) no coincide. Daré prioridad a: <b>{ext_base['calidad']}</b>")
+
+                final_accionado_display = ext_base['accionado']
+                usar_accionado_usuario = False
                 if partes_accionado_u:
                     encontrado_acc = False
                     for parte in partes_accionado_u:
@@ -811,28 +794,34 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                         if len(sigla_parte) >= 2 and sigla_parte in ext_base['accionado']:
                             encontrado_acc = True
                             break
-                    if not encontrado_acc:
-                        alertas.append(f"El accionado (<b>{final_accionado_display}</b>) no coincide. Encontré: <b>{ext_base['accionado']}</b>")
-                        
+                    if encontrado_acc:
+                        usar_accionado_usuario = True
+                        final_accionado_display = " | ".join(partes_accionado_u)
+                    else:
+                        alertas.append(f"El accionado (<b>{' | '.join(partes_accionado_u)}</b>) no coincide. Daré prioridad a: <b>{ext_base['accionado']}</b>")
+
+                final_derecho_display = ", ".join(ext_base['derechos'])
+                usar_derecho_usuario = False
+                derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
+                
                 if param_u_der and param_u_der != "NO APLICA":
                     encontrado_der = False
                     for d_base in derechos_base_limpios:
                         if param_u_der in d_base or d_base in param_u_der:
                             encontrado_der = True
                             break
-                    if not encontrado_der:
+                    if encontrado_der:
+                        usar_derecho_usuario = True
+                        final_derecho_display += f" <br><small>(Guía del usuario: {u_derecho})</small>"
+                    else:
                         alertas.append(f"El derecho (<b>{u_derecho}</b>) no se encontró. Daré prioridad a: <b>{', '.join(ext_base['derechos'])}</b>")
 
                 html_alertas = ""
                 if alertas:
-                    html_alertas = "<div style='margin-top: 15px; padding: 10px; background-color: #ffeeba; border-left: 5px solid #ffc107; color: #856404; font-size: 14px;'><b>⚠️ ¡Atención! Lo que me dijiste no lo encontré, pero encontré esto en la Sentencia Arquimédica:</b><ul style='margin-top: 5px;'>"
+                    html_alertas = "<div style='margin-top: 15px; padding: 10px; background-color: #ffeeba; border-left: 5px solid #ffc107; color: #856404; font-size: 14px;'><b>⚠️ ¡Atención! Algunas de tus guías no fueron halladas en la Sentencia Arquimédica. He dado prioridad al documento original:</b><ul style='margin-top: 5px;'>"
                     for alerta in alertas:
                         html_alertas += f"<li>{alerta}</li>"
                     html_alertas += "</ul></div>"
-                
-                final_derecho_display = ", ".join(ext_base['derechos'])
-                if param_u_der and param_u_der != "NO APLICA":
-                     final_derecho_display += f" <br><small>(Guía del usuario: {u_derecho})</small>"
                 
                 st.session_state['html_parametros_g'] = f"""
                 <div class="param-box">
@@ -872,7 +861,7 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                     match_calidad = False
                     calidad_limpia_info = limpiar_texto_usuario(info['calidad'])
                     calidad_limpia_final = limpiar_texto_usuario(final_calidad)
-                    if calidad_limpia_final in calidad_limpia_info or calidad_limpia_info in calidad_limpia_final:
+                    if calidad_limpia_final in calidad_limpia_info or calidad_limpia_info in calidad_limpia_final or final_calidad == "NO IDENTIFICADA (CIVIL)":
                         match_calidad = True
                     else:
                         fallos.append(f"Calidad difiere ({info['calidad']})")
@@ -880,7 +869,7 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                     match_accionado = False
                     acc_comp_lista = limpiar_y_separar_sujetos(info["accionado"])
                     
-                    if partes_accionado_u:
+                    if usar_accionado_usuario:
                         for parte in partes_accionado_u:
                             parte_limpia = limpiar_texto_usuario(parte)
                             if len(parte_limpia) > 2:
@@ -894,18 +883,21 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                                         break
                             if match_accionado: break
                     else:
-                        acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
-                        for a_base in acc_base_lista:
-                            for a_comp in acc_comp_lista:
-                                siglas_base = generar_siglas(a_base)
-                                siglas_comp = generar_siglas(a_comp)
-                                if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
-                                   (len(siglas_base) >= 2 and siglas_base in a_comp) or \
-                                   (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
-                                   (len(siglas_base) >= 2 and siglas_base == siglas_comp):
-                                    match_accionado = True
-                                    break
-                            if match_accionado: break
+                        if ext_base['accionado'] == "NO IDENTIFICADO":
+                            match_accionado = True
+                        else:
+                            acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
+                            for a_base in acc_base_lista:
+                                for a_comp in acc_comp_lista:
+                                    siglas_base = generar_siglas(a_base)
+                                    siglas_comp = generar_siglas(a_comp)
+                                    if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
+                                       (len(siglas_base) >= 2 and siglas_base in a_comp) or \
+                                       (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
+                                       (len(siglas_base) >= 2 and siglas_base == siglas_comp):
+                                        match_accionado = True
+                                        break
+                                if match_accionado: break
                             
                     if not match_accionado:
                         fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
@@ -913,7 +905,7 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                     match_derecho = False
                     derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
                     
-                    if ext_base['derechos'] == ["NO IDENTIFICADO"] and (not param_u_der or param_u_der == "NO APLICA"):
+                    if ext_base['derechos'] == ["NO IDENTIFICADO"] and not usar_derecho_usuario:
                         match_derecho = True
                     else:
                         for d_base in derechos_base_limpios:
@@ -924,7 +916,7 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                                     break
                             if match_derecho: break
                         
-                        if not match_derecho and param_u_der and param_u_der != "NO APLICA":
+                        if not match_derecho and usar_derecho_usuario:
                             for d_info in derechos_info_limpios:
                                 if param_u_der in d_info or d_info in param_u_der:
                                     match_derecho = True
