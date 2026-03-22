@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import PyPDF2
 import re
 from fpdf import FPDF
@@ -13,25 +14,12 @@ import random
 # --- 1. CONFIGURACIÓN Y ESTILOS VISUALES ---
 st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide")
 
-# (NUEVO) Pestaña de configuración lateral (Modo Oscuro y Sonido)
+# Pestaña de configuración lateral (Solo Sonido)
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>⚙️ Configuración</h2>", unsafe_allow_html=True)
-    modo_oscuro = st.toggle("🌙 Activar Modo Oscuro", value=False)
     silenciar_sonido = st.toggle("🔇 Silenciar Música y Efectos", value=False)
 
-# (NUEVO) Lógica para inyectar CSS del Modo Oscuro si el usuario lo activa
-css_modo_oscuro = ""
-if modo_oscuro:
-    css_modo_oscuro = """
-    html, body, [class*="css"] { background-color: #121212 !important; color: #e2e8f0 !important; }
-    .param-box { background-color: #1e293b !important; color: #e2e8f0 !important; border: 2px solid #ffc106 !important; }
-    .param-box b, .param-box li, .param-box ul { color: #e2e8f0 !important; }
-    h1, h2, h3, h4, h5, p, span, div { color: #f8fafc !important; }
-    .stButton>button, div[data-testid="stFormSubmitButton"]>button { background-color: #334155 !important; color: #ffc106 !important; border-color: #ffc106 !important; }
-    .welcome-wrapper { background: linear-gradient(135deg, #020617 0%, #0f172a 100%) !important; border: 1px solid #ffc106 !important; }
-    """
-
-# Función unificada para carga de imagen y audio en Base64
+# Función para cargar imagen o audio en Base64
 def cargar_archivo_base64(ruta):
     if os.path.exists(ruta):
         with open(ruta, "rb") as archivo:
@@ -41,38 +29,24 @@ def cargar_archivo_base64(ruta):
 img_logo_b64 = cargar_archivo_base64("Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png")
 img_login_b64 = cargar_archivo_base64("IMAGEN 4.png")
 
-# (NUEVO) Reproductor de audio invisible
-def reproducir_audio_oculto(archivo, loop=False):
-    if silenciar_sonido: 
-        return
-    b64 = cargar_archivo_base64(archivo)
-    if b64:
-        loop_attr = "loop" if loop else ""
-        st.markdown(f"""
-        <audio autoplay {loop_attr} style="display:none;">
-            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        </audio>
-        """, unsafe_allow_html=True)
-
-st.markdown(f"""
+st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
-    html, body, [class*="css"] {{ font-family: 'Montserrat', sans-serif; background-color: white; color: #1a1a1a; }}
-    .main-title {{ font-size: 38px; font-weight: 800; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; text-transform: uppercase; }}
+    html, body, [class*="css"] { font-family: 'Montserrat', sans-serif; background-color: white; color: #1a1a1a; }
+    .main-title { font-size: 38px; font-weight: 800; border-left: 10px solid #ffc106; padding-left: 20px; margin-bottom: 30px; text-transform: uppercase; }
 
     /* --- ANIMACIONES CSS --- */
-    @keyframes fadeInUp {{
-        0% {{ opacity: 0; transform: translateY(40px); }}
-        100% {{ opacity: 1; transform: translateY(0); }}
-    }}
-
-    @keyframes fadeIn {{
-        0% {{ opacity: 0; }}
-        100% {{ opacity: 1; }}
-    }}
+    @keyframes fadeInUp {
+        0% { opacity: 0; transform: translateY(40px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
     
     /* --- ESTILOS DE PÁGINA DE BIENVENIDA --- */
-    .welcome-wrapper {{
+    .welcome-wrapper {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         padding: 60px 40px;
         border-radius: 16px;
@@ -82,43 +56,40 @@ st.markdown(f"""
         margin-bottom: 40px;
         border: 1px solid #334155;
         animation: fadeInUp 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-    }}
-    .ecomoda-header {{ font-size: 16px; color: #94a3b8; letter-spacing: 5px; font-weight: 600; margin-top: 15px; margin-bottom: 25px; text-transform: uppercase; }}
-    .welcome-title {{ font-size: 46px; font-weight: 800; color: #ffc106 !important; margin-bottom: 20px; line-height: 1.2; text-transform: uppercase; }}
-    .welcome-subtitle {{ font-size: 18px; color: #f8fafc !important; font-weight: 400; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.6; }}
+    }
+    .ecomoda-header { font-size: 16px; color: #94a3b8; letter-spacing: 5px; font-weight: 600; margin-top: 15px; margin-bottom: 25px; text-transform: uppercase; }
+    .welcome-title { font-size: 46px; font-weight: 800; color: #ffc106 !important; margin-bottom: 20px; line-height: 1.2; text-transform: uppercase; }
+    .welcome-subtitle { font-size: 18px; color: #f8fafc !important; font-weight: 400; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.6; }
 
     /* --- BOTONES Y FORMULARIOS --- */
-    .stButton>button, div[data-testid="stFormSubmitButton"]>button {{
+    .stButton>button, div[data-testid="stFormSubmitButton"]>button {
         background-color: #ffc106; color: black; border: 2px solid black; font-weight: bold; width: 100%; height: 50px; text-transform: uppercase; letter-spacing: 1px;
         transition: all 0.3s ease; border-radius: 8px;
-    }}
-    .stButton>button:hover, div[data-testid="stFormSubmitButton"]>button:hover {{
+    }
+    .stButton>button:hover, div[data-testid="stFormSubmitButton"]>button:hover {
         background-color: black; color: #ffc106; transform: scale(1.02);
-    }}
+    }
 
-    .btn-guiado>button {{ background-color: #0f172a; color: #ffc106; border: 2px solid #ffc106; }}
-    .btn-guiado>button:hover {{ background-color: #ffc106; color: #0f172a; }}
-    .guide-button {{
+    .btn-guiado>button { background-color: #0f172a; color: #ffc106; border: 2px solid #ffc106; }
+    .btn-guiado>button:hover { background-color: #ffc106; color: #0f172a; }
+    .guide-button {
         display: flex; align-items: center; justify-content: center; background-color: transparent; color: #ffc106; border: 2px solid #ffc106; font-weight: bold; width: 100%; height: auto;
         padding: 12px 10px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease; border-radius: 8px; text-decoration: none; margin-top: 15px; font-size: 13px;
-    }}
-    .guide-button:hover {{ background-color: #ffc106; color: black; transform: scale(1.02); text-decoration: none; }}
-    .param-box {{ background-color: #f8f9fa; border: 2px solid #ffc106; padding: 20px; border-radius: 10px; margin-bottom: 25px; color: #000000 !important; }}
-    .param-box b, .param-box li, .param-box ul {{ color: #000000 !important; }}
+    }
+    .guide-button:hover { background-color: #ffc106; color: black; transform: scale(1.02); text-decoration: none; }
+    .param-box { background-color: #f8f9fa; border: 2px solid #ffc106; padding: 20px; border-radius: 10px; margin-bottom: 25px; color: #000000 !important; }
+    .param-box b, .param-box li, .param-box ul { color: #000000 !important; }
 
     /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA Y FORMULARIO --- */
-    div[data-testid="stTextInput"], .stButton, div[data-testid="stFormSubmitButton"] {{ position: relative; z-index: 10; }}
-    div[data-testid="stForm"] {{ border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }}
-    .login-img-container {{ position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0;
-        animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }}
-    .loading-container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }}
-    
-    /* INYECCIÓN DEL MODO OSCURO */
-    {css_modo_oscuro}
+    div[data-testid="stTextInput"], .stButton, div[data-testid="stFormSubmitButton"] { position: relative; z-index: 10; }
+    div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
+    .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0;
+        animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
+    .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. LISTAS Y CONFIGURACIONES ---
+# --- 2. LISTAS Y CONFIGURACIONES INICIALES ---
 LISTA_DERECHOS = [
     "No aplica", "Acceso a la administración de justicia", "Acceso progresivo a la tierra", "Agua potable",
     "Ambiente sano", "Asociación sindical", "Ayuda humanitaria", "Consulta previa", "Debido proceso",
@@ -143,20 +114,70 @@ if 'auth' not in st.session_state: st.session_state['auth'] = False
 if 'uploader_key' not in st.session_state: st.session_state['uploader_key'] = 0
 if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = None
 
-# --- GESTOR DE ESTADO DE EFECTOS DE SONIDO ---
-if st.session_state['sfx_pendiente']:
-    reproducir_audio_oculto(st.session_state['sfx_pendiente'], loop=False)
-    st.session_state['sfx_pendiente'] = None
 
-# --- REPRODUCTOR DE MÚSICA AMBIENTAL (PORTALES) ---
-pagina = st.session_state.get('pagina_actual', 'bienvenida')
-if pagina in ['bienvenida', 'login']:
-    reproducir_audio_oculto("INCIDENTAL1_mezcla.mp3", loop=True)
-elif pagina in ['app_garzon', 'app_garzon_guiado']:
-    reproducir_audio_oculto("INCIDENTAL 2_mezcla.mp3", loop=True)
+# --- 3. GESTOR DE AUDIO GLOBAL AVANZADO (Evita Solapamientos) ---
+def renderizar_gestor_audio():
+    pagina = st.session_state.get('pagina_actual', 'bienvenida')
+    
+    # Asignar canción de fondo según la página
+    bg_file = "INCIDENTAL1_mezcla.mp3" if pagina in ['bienvenida', 'login', 'cargando'] else "INCIDENTAL 2_mezcla.mp3"
+    sfx_file = st.session_state['sfx_pendiente']
+    
+    bg_b64 = cargar_archivo_base64(bg_file) if bg_file and os.path.exists(bg_file) else ""
+    sfx_b64 = cargar_archivo_base64(sfx_file) if sfx_file and os.path.exists(sfx_file) else ""
+    
+    html_code = f"""
+    <script>
+    const silenciar = {str(silenciar_sonido).lower()};
+    const parentWindow = window.parent;
+
+    // --- MÚSICA DE FONDO CONTINUA ---
+    if (!parentWindow.bgMusicPlayer) {{
+        parentWindow.bgMusicPlayer = new Audio();
+        parentWindow.bgMusicPlayer.loop = true;
+        parentWindow.bgMusicPlayer.volume = 0.4; // Música suave
+    }}
+    
+    if (silenciar) {{
+        parentWindow.bgMusicPlayer.pause();
+    }} else {{
+        const bgB64 = "{bg_b64}";
+        if (bgB64) {{
+            const newSrc = "data:audio/mp3;base64," + bgB64;
+            // Solo cambia la canción si es diferente (evita reinicios y solapamientos)
+            if (parentWindow.bgMusicPlayer.src !== newSrc) {{
+                parentWindow.bgMusicPlayer.src = newSrc;
+                parentWindow.bgMusicPlayer.play().catch(e => console.log("Autoplay bloqueado por navegador"));
+            }} else if (parentWindow.bgMusicPlayer.paused) {{
+                parentWindow.bgMusicPlayer.play().catch(e => console.log("Autoplay bloqueado por navegador"));
+            }}
+        }} else {{
+            parentWindow.bgMusicPlayer.pause();
+        }}
+    }}
+
+    // --- EFECTOS DE SONIDO ---
+    if (!parentWindow.sfxAudioPlayer) {{
+        parentWindow.sfxAudioPlayer = new Audio();
+        parentWindow.sfxAudioPlayer.volume = 0.8;
+    }}
+
+    const sfxB64 = "{sfx_b64}";
+    if (!silenciar && sfxB64) {{
+        parentWindow.sfxAudioPlayer.src = "data:audio/mp3;base64," + sfxB64;
+        parentWindow.sfxAudioPlayer.play().catch(e => console.log("Autoplay de SFX bloqueado"));
+    }}
+    </script>
+    """
+    components.html(html_code, width=0, height=0)
+
+# Renderizamos el audio en segundo plano
+renderizar_gestor_audio()
+# Limpiamos el efecto para que no suene en repetición
+st.session_state['sfx_pendiente'] = None
 
 
-# --- 3. FUNCIONES AUXILIARES ---
+# --- 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO ---
 def limpiar_texto_usuario(texto):
     if not texto: return ""
     texto = str(texto).upper().strip()
@@ -175,12 +196,10 @@ def highlight_veredicto(val):
     return ''
 
 def limpiar_y_separar_sujetos(texto):
-    """Toma una cadena con varios nombres ('A, B y C') y devuelve una lista limpia ['A', 'B', 'C']"""
     texto_limpio = limpiar_texto_usuario(texto)
     sujetos = re.split(r'\s+Y\s+|\s+E\s+|,', texto_limpio)
     return [s.strip() for s in sujetos if len(s.strip()) > 3]
 
-# --- 4. MOTOR DE EXTRACCIÓN JURÍDICO ---
 def motor_juridico_final(pdf_file):
     texto_acumulado = ""
     try:
@@ -370,6 +389,7 @@ if st.session_state['pagina_actual'] == 'bienvenida':
             st.session_state['pagina_actual'] = 'cargando'
             st.rerun()
 
+    # El link AHORA SÓLO APARECE en esta pantalla
     st.markdown("""
         <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
             📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
@@ -379,7 +399,7 @@ if st.session_state['pagina_actual'] == 'bienvenida':
 
 
 # =====================================================================
-# PANTALLA INTERMEDIA: LÍNEA DE CARGA (MENSAJES ALEATORIOS)
+# PANTALLA INTERMEDIA: LÍNEA DE CARGA
 # =====================================================================
 if st.session_state['pagina_actual'] == 'cargando':
     st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
@@ -388,25 +408,8 @@ if st.session_state['pagina_actual'] == 'cargando':
     with col2:
         mensajes_carga = [
             "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
-            "¿Habrá una manera más fácil de hacer línea jurisprudencial?...", "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", "Explorando la relatoría constitucional...",
-            "Indexando precedentes relevantes...", "Analizando línea jurisprudencial en construcción...", "Cruzando criterios de las altas cortes...", "Revisando subreglas implícitas...", "Interpretando el alcance del precedente...",
-            "Organizando sentencias por relevancia...", "Afinando el análisis jurídico...", "Detectando patrones jurisprudenciales...", "Comparando decisiones clave...", "Evaluando consistencia del precedente...",
-            "Filtrando decisiones contradictorias...", "Leyendo entre líneas del fallo...", "Estructurando la ratio decidendi...", "Separando obiter dicta...", "Reconstruyendo la línea jurisprudencial...",
-            "Buscando coherencia en las decisiones...", "Consultando criterios reiterados...", "Identificando sentencias hito...", "Analizando evolución doctrinal...", "Interpretando el bloque de constitucionalidad...",
-            "Ajustando el mapa jurisprudencial...", "Rastreando cambios de postura...", "Validando argumentos jurídicos...", "Sistematizando información judicial...", "Detectando tensiones interpretativas...",
-            "Buscando el precedente dominante...", "Clasificando derechos involucrados...", "Estimando impacto de la decisión...", "Refinando resultados del análisis...", "Preparando café jurídico  ☕ ...",
-            "Afinando la toga digital...", "Desempolvando precedentes olvidados...", "Preguntándole a la Corte '¿y esto cómo era?'...", "Haciendo magia con jurisprudencia...", "Invocando el espíritu del precedente...",
-            "Traduciendo lenguaje jurídico a lógica...", "Buscando esa sentencia que lo cambia todo...", "Ordenando el caos jurisprudencial...", "Pensando como magistrado por un momento...", "Ejecutando análisis de consistencia jurisprudencial...",
-            "Procesando relaciones entre precedentes...", "Evaluando jerarquía de decisiones...", "Optimizando el rastreo de sentencias...", "Analizando criterios de unificación...", "Procesando estructura argumentativa del fallo...",
-            "Consultando a la Corte... (modo intenso activado)", "Convenciendo a la jurisprudencia de que coopere...", "Negociando con precedentes rebeldes...", "Buscando esa sentencia que todos citan pero nadie ha leído...",
-            "Traduciendo 'lenguaje jurídico' a 'lenguaje humano'...", "Revisando si el magistrado estaba de buen humor ese día...", "Detectando contradicciones... y fingiendo sorpresa", "Intentando que todo esto tenga sentido...",
-            "Leyendo la sentencia completa... sí, completa  😅 ", "Analizando… o al menos eso parece", "Espera, esto se puso interesante...", "¿Ratio decidendi o improvisación elegante?", "Preguntándole al precedente '¿tú qué opinas?'...",
-            "Cruzando los dedos para que haya coherencia...", "Esto claramente necesita más café ☕ ", "Buscando la lógica... seguimos buscando...", "¿Otra subregla? Claro, ¿por qué no?", "Organizando el caos (intento #3)...",
-            "Simulando entender todo a la primera...", "¿Seguro que esto no podía ser más simple?", "Releyendo por tercera vez... por si acaso", "Cuando creías que ya habías terminado... aparece otra sentencia",
-            "Insertando cara seria de análisis jurídico...", "Ejecutando 'modo abogado': depende", "Analizando excepciones de las excepciones...", "Este argumento tiene potencial... o eso esperamos", "Si esto encaja, será un milagro jurídico",
-            "Compilando sabiduría judicial... paciencia...", "Verificando si esto ya lo había dicho la Corte antes (spoiler: sí)", "¿Línea jurisprudencial o montaña rusa? 🎢 ", "Esto merece un pie de página… largo",
-            "Buscando coherencia… versión extendida", "Plot twist: hay otra interpretación", "A ver, a ver… esto no estaba en el resumen", "Analizando con fe y jurisprudencia", "Cargando argumentos... algunos más sólidos que otros",
-            "Reconciliando decisiones que claramente no se hablan entre sí", "Aplicando lógica jurídica… con optimismo", "¿Quién redactó esto y por qué tan largo?", "Interpretando lo que el magistrado 'quiso decir'"
+            "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
+            "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico  ☕ ...", "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial..."
         ]
         mensaje_actual = random.choice(mensajes_carga)
         st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
@@ -532,12 +535,9 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                         estado = ""
                         fallos = []
                         
-                        # --- CHECK 1: CALIDAD ---
                         match_calidad = (info['calidad'] == ext_base['calidad']) or (ext_base['calidad'] == "NO IDENTIFICADA (CIVIL)")
-                        if not match_calidad:
-                            fallos.append(f"Calidad difiere ({info['calidad']})")
+                        if not match_calidad: fallos.append(f"Calidad difiere ({info['calidad']})")
                             
-                        # --- CHECK 2: ACCIONADO ---
                         match_accionado = False
                         if ext_base['accionado'] == "NO IDENTIFICADO":
                             match_accionado = True
@@ -555,10 +555,8 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                                         match_accionado = True
                                         break
                                 if match_accionado: break
-                        if not match_accionado:
-                            fallos.append(f"Accionado difiere")
+                        if not match_accionado: fallos.append(f"Accionado difiere")
                             
-                        # --- CHECK 3: DERECHO ---
                         match_derecho = False
                         derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
                         if ext_base['derechos'] == ["NO IDENTIFICADO"]:
@@ -571,16 +569,11 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                                         match_derecho = True
                                         break
                                 if match_derecho: break
-                        if not match_derecho:
-                            fallos.append("Derecho difiere")
+                        if not match_derecho: fallos.append("Derecho difiere")
 
-                        # --- VEREDICTO FINAL ---
-                        if not match_calidad or not match_accionado:
-                            estado = " ❌ EXCLUIDA"
-                        elif match_calidad and match_accionado and match_derecho:
-                            estado = " ✅ INCLUIDA"
-                        elif match_calidad and match_accionado and not match_derecho:
-                            estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
+                        if not match_calidad or not match_accionado: estado = " ❌ EXCLUIDA"
+                        elif match_calidad and match_accionado and match_derecho: estado = " ✅ INCLUIDA"
+                        elif match_calidad and match_accionado and not match_derecho: estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
                             
                         resultados.append({
                             "Archivo": f.name,
@@ -594,8 +587,7 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                         
                     st.session_state['resultados_df'] = pd.DataFrame(resultados)
                     
-                    def safe_pdf(txt):
-                        return str(txt).encode('latin-1', 'replace').decode('latin-1')
+                    def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
 
                     pdf = FPDF()
                     pdf.add_page()
@@ -606,12 +598,9 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                     pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA (ARQUIMÉDICA):\nSujeto (Calidad): {ext_base['calidad']}\nObjeto (Accionado): {ext_base['accionado']}\nTema (Derecho): {', '.join(ext_base['derechos'])}\n" + "="*50))
                     
                     for r in resultados:
-                        if " ✅ " in r["Veredicto"]:
-                            pdf.set_fill_color(220, 255, 220) 
-                        elif " ⚠️ " in r["Veredicto"]:
-                            pdf.set_fill_color(255, 255, 153) 
-                        else:
-                            pdf.set_fill_color(255, 220, 220) 
+                        if " ✅ " in r["Veredicto"]: pdf.set_fill_color(220, 255, 220) 
+                        elif " ⚠️ " in r["Veredicto"]: pdf.set_fill_color(255, 255, 153) 
+                        else: pdf.set_fill_color(255, 220, 220) 
                             
                         pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
                         pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
@@ -652,7 +641,6 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
     st.subheader(" 📝 1. Ingresa tu Escenario y Tema Jurídico")
     st.info("Llena los campos definidos. Garzón los usará como 'Regla Única' y evaluará el cumplimiento de los 3 Criterios (Sujeto, Objeto, Derecho).")
 
-    # SUJETO
     st.markdown("<b> 👤 Datos del Accionante (Quien demanda):</b>", unsafe_allow_html=True)
     col_u1, col_u2, col_u3 = st.columns(3)
     with col_u1:
@@ -668,7 +656,6 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
             u_calidad = u_calidad_sel
         if u_calidad == "Periodista/Comunicador social": u_calidad = "PERIODISTA"
 
-    # OBJETO
     st.markdown("<br><b> 🏢 Datos del Accionado (Quien vulnera el derecho):</b>", unsafe_allow_html=True)
     col_a1, col_a2, col_a3 = st.columns(3)
     with col_a1:
@@ -678,7 +665,6 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
     with col_a3:
         u_accionado_entidad = st.text_input("Entidad vinculada (Ej: Ministerio, UNP)")
 
-    # TEMA
     st.markdown("<br><b> ⚖️ Datos del Derecho Vulnerado (Tema):</b>", unsafe_allow_html=True)
     col_d1, col_d2 = st.columns(2)
     with col_d1:
@@ -793,12 +779,9 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                         estado = ""
                         fallos = []
 
-                        # --- CHECK 1: CALIDAD ---
                         match_calidad = (info['calidad'] == final_calidad) or (final_calidad == "NO IDENTIFICADA (CIVIL)")
-                        if not match_calidad:
-                            fallos.append(f"Calidad difiere ({info['calidad']})")
+                        if not match_calidad: fallos.append(f"Calidad difiere ({info['calidad']})")
 
-                        # --- CHECK 2: ACCIONADO ---
                         match_accionado = False
                         acc_comp_lista = limpiar_y_separar_sujetos(info['accionado'])
                         
@@ -810,8 +793,7 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                                         break
                                 if match_accionado: break
                         else:
-                            if ext_base['accionado'] == "NO IDENTIFICADO":
-                                match_accionado = True
+                            if ext_base['accionado'] == "NO IDENTIFICADO": match_accionado = True
                             else:
                                 acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
                                 for a_base in acc_base_lista:
@@ -826,10 +808,8 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                                             break
                                     if match_accionado: break
                                     
-                        if not match_accionado:
-                            fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
+                        if not match_accionado: fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
 
-                        # --- CHECK 3: DERECHO ---
                         match_derecho = False
                         derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
                         
@@ -850,16 +830,11 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                                         match_derecho = True
                                         break
                                         
-                        if not match_derecho:
-                            fallos.append("Derecho difiere")
+                        if not match_derecho: fallos.append("Derecho difiere")
 
-                        # --- VEREDICTO FINAL ---
-                        if not match_calidad or not match_accionado:
-                            estado = " ❌ EXCLUIDA"
-                        elif match_calidad and match_accionado and match_derecho:
-                            estado = " ✅ INCLUIDA"
-                        elif match_calidad and match_accionado and not match_derecho:
-                            estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
+                        if not match_calidad or not match_accionado: estado = " ❌ EXCLUIDA"
+                        elif match_calidad and match_accionado and match_derecho: estado = " ✅ INCLUIDA"
+                        elif match_calidad and match_accionado and not match_derecho: estado = " ⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
 
                         resultados.append({
                             "Archivo": f.name,
@@ -873,8 +848,7 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                         
                     st.session_state['resultados_df_g'] = pd.DataFrame(resultados)
                     
-                    def safe_pdf(txt):
-                        return str(txt).encode('latin-1', 'replace').decode('latin-1')
+                    def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
 
                     pdf = FPDF()
                     pdf.add_page()
@@ -885,12 +859,9 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                     pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA:\nSujeto (Calidad): {final_calidad}\nObjeto (Accionado): {final_accionado_display}\nTema (Derecho): {final_derecho_display}\n" + "="*50))
                     
                     for r in resultados:
-                        if " ✅ " in r["Veredicto"]:
-                            pdf.set_fill_color(220, 255, 220) 
-                        elif " ⚠️ " in r["Veredicto"]:
-                            pdf.set_fill_color(255, 255, 153) 
-                        else:
-                            pdf.set_fill_color(255, 220, 220) 
+                        if " ✅ " in r["Veredicto"]: pdf.set_fill_color(220, 255, 220) 
+                        elif " ⚠️ " in r["Veredicto"]: pdf.set_fill_color(255, 255, 153) 
+                        else: pdf.set_fill_color(255, 220, 220) 
                             
                         pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
                         pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
