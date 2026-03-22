@@ -85,7 +85,23 @@ st.markdown("""
     
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
     
-    .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0; animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
+    .login-img-container { 
+        position: fixed; 
+        bottom: 0px; 
+        /* Right se gestiona por JS para moverse dinámicamente */
+        right: -12%; 
+        height: 80vh; 
+        width: auto; 
+        object-fit: contain; 
+        opacity: 0; 
+        animation: fadeIn 1.2s ease 0.1s forwards; 
+        z-index: 999; 
+        pointer-events: none; 
+        transition: right 0.3s ease-out; /* Esta transición asegura la fluidez al abrir el menú */
+    }
+    
+    /* Estilos para centrar la barra de carga */
+    .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -116,8 +132,26 @@ if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = 
 if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
 if 'musica_pista' not in st.session_state: st.session_state['musica_pista'] = None
 
-# --- 3. GESTOR DE AUDIO GLOBAL AVANZADO ---
-def renderizar_gestor_audio():
+# --- BARAJEADO PERFECTO DE FRASES (GARANTIZA NO REPETIR) ---
+if 'frases_disponibles' not in st.session_state or not st.session_state['frases_disponibles']:
+    todas_las_frases = [
+        "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", 
+        "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
+        "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", 
+        "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
+        "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico ☕...", 
+        "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial...",
+        "Traduciendo 'lenguaje jurídico' a 'lenguaje humano'...", "Consultando a la Corte... (modo intenso activado)",
+        "¿Seguro que esto no podía ser más simple?", "Cuando creías que ya habías terminado... aparece otra sentencia",
+        "Cruzando criterios de las altas cortes...", "Intentando que todo esto tenga sentido...",
+        "Negociando con precedentes rebeldes..."
+    ]
+    random.shuffle(todas_las_frases) # Se barajan al azar
+    st.session_state['frases_disponibles'] = todas_las_frases
+
+
+# --- 3. GESTOR DE AUDIO GLOBAL Y JS DINÁMICO ---
+def renderizar_gestor_y_efectos():
     silenciado = st.session_state.get('silenciar_sonido', False)
     bg_b64 = ""
     sfx_b64 = ""
@@ -132,8 +166,9 @@ def renderizar_gestor_audio():
     <script>
     try {{
         const doc = window.parent.document;
-        const silenciado = {str(silenciado).lower()};
         
+        // 1. GESTIÓN DEL AUDIO
+        const silenciado = {str(silenciado).lower()};
         let bgAudio = doc.getElementById('ecomoda-bg-music');
         if (!bgAudio) {{
             bgAudio = doc.createElement('audio');
@@ -167,15 +202,41 @@ def renderizar_gestor_audio():
             sfxAudio.volume = 0.8;
             sfxAudio.play().catch(e => console.log("Autoplay SFX bloqueado"));
         }}
+
+        // 2. GESTIÓN DEL DESPLAZAMIENTO FLUIDO DE LA IMAGEN
+        const checkImg = setInterval(() => {{
+            const img = doc.querySelector('.login-img-container');
+            const mainBlock = doc.querySelector('[data-testid="stAppViewBlockContainer"]');
+            
+            if (img && mainBlock) {{
+                clearInterval(checkImg); // Dejamos de buscar una vez lo encuentra
+                
+                const updateImgPosition = () => {{
+                    const rect = mainBlock.getBoundingClientRect();
+                    // Calculamos el espacio a la derecha del contenedor central
+                    const gapDerecho = window.innerWidth - rect.right;
+                    // Restamos unos píxeles para que la imagen mantenga su desborde característico
+                    img.style.right = (gapDerecho - 80) + "px"; 
+                }};
+                
+                // Observamos cualquier cambio de tamaño o margen (como al abrir configuración)
+                const observer = new ResizeObserver(updateImgPosition);
+                observer.observe(mainBlock);
+                updateImgPosition(); // Aplicar de inmediato
+            }}
+        }}, 100);
+        // Detener después de 3 segundos si no estamos en la página del login
+        setTimeout(() => clearInterval(checkImg), 3000);
+
     }} catch (error) {{
-        console.log("Error de audio:", error);
+        console.log("Error de JS:", error);
     }}
     </script>
     """
     components.html(js_code, width=0, height=0)
     st.session_state['sfx_pendiente'] = None
 
-renderizar_gestor_audio()
+renderizar_gestor_y_efectos()
 
 # --- 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO ---
 def limpiar_texto_usuario(texto):
@@ -453,23 +514,20 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     
     st.stop()
 
-# PANTALLA INTERMEDIA: LÍNEA DE CARGA
+# PANTALLA INTERMEDIA: LÍNEA DE CARGA (Minimalista y Rápida)
 elif st.session_state['pagina_actual'] == 'cargando':
     st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-        mensajes_carga = [
-            "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", "Analizando estadísticas...", "Yendo por café para trabajar...", "¿Análisis jurisprudencial? Vamos a ello...",
-            "Buscando sentencias relevantes...", "Conectando con el servidor jurisprudencial...", "Explorando la relatoría constitucional...", "Indexando precedentes relevantes...",
-            "Analizando línea jurisprudencial en construcción...", "Preparando café jurídico  ☕ ...", "Ordenando el caos jurisprudencial...", "Ejecutando análisis de consistencia jurisprudencial..."
-        ]
-        mensaje_actual = random.choice(mensajes_carga)
+        # Se saca un mensaje que no se haya repetido
+        mensaje_actual = st.session_state['frases_disponibles'].pop()
+        
         st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
         barra_carga = st.progress(0)
         
         for porcentaje in range(100):
-            time.sleep(0.015) 
+            time.sleep(0.01) # Ultra rápido para no hacer esperar
             barra_carga.progress(porcentaje + 1)
             
         st.session_state['pagina_actual'] = 'login'
