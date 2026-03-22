@@ -132,12 +132,13 @@ st.markdown("""
         z-index: 10; 
     }
     
-    /* Hace que la barra de contraseña sea más corta y centrada */
+    /* Hace que la barra de contraseña sea más corta pero alineada a la izquierda */
     div[data-testid="stForm"] {
         border: none;
         padding: 0;
         max-width: 350px;
-        margin: 0 auto;
+        margin: 0; /* Remueve el centrado automático */
+        margin-left: 0; /* Fuerza la alineación a la izquierda */
         background-color: transparent;
     }
     
@@ -410,7 +411,7 @@ if st.session_state['pagina_actual'] == 'login':
     with col2:
         st.info("Por favor, identifícate para acceder al motor de análisis.")
         
-        # --- FORMULARIO (Soporta tecla Enter y acorta la barra) ---
+        # --- FORMULARIO (Soporta tecla Enter, acorta la barra y alinea a la izq) ---
         with st.form(key='login_form', clear_on_submit=False):
             clave = st.text_input("Ingrese la clave de seguridad:", type="password")
             submit_button = st.form_submit_button("INGRESAR")
