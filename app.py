@@ -95,7 +95,12 @@ LISTA_DERECHOS = [
     "Derecho a la reparación a población víctima de desplazamiento", "Derecho a la vida libre de violencia de género", 
     "Derecho a morir dignamente", "Derecho al acceso a cargos públicos", "Derecho al buen nombre", 
     "Derecho de los niños", "Derecho de petición", "Dignidad humana", "Educación", "Elegir y ser elegido", 
-    "Libre desarrollo de la personalidad", "Libre expresión", "Libertad de prensa", 
+    "Estabilidad laboral reforzada", "Familia", "Habeas data", "Identidad cultural", "Identidad sexual y de genero", 
+    "Igualdad", "Integridad personal, fisica y psicologica", "Interrupción voluntaria del embarazo", "Intimidad", 
+    "Intimidad familiar", "Libertad", "Libertad de culto", "Libertad de enseñanza", "Libertad de expresión", 
+    "Libertad de información", "Libertad de locomoción y domicilio", "Libertad de opinión", "Libertad de prensa", 
+    "Libertad de profesión u oficio", "Libre desarrollo de la personalidad", "Mínimo vital", "Objeción de conciencia", 
+    "Participación en materia ambiental", "Participación política", "Personalidad jurídica", "Propiedad privada", 
     "Reconocimiento de persona en condición de desplazamiento mediante el ruv", "Recreación y deporte", 
     "Salud", "Seguridad personal", "Seguridad social", "Sexuales y reproductivos", 
     "Suministro de energía eléctrica", "Trabajo", "Tranquilidad personal", "Vida", "Visita íntima", 
@@ -221,12 +226,15 @@ def motor_juridico_final(pdf_file):
         "ASOCIACION SINDICAL", "AYUDA HUMANITARIA", "CONSULTA PREVIA", "DEBIDO PROCESO",
         "CAPACIDAD JURIDICA", "HONRA", "NACIONALIDAD", "PAZ", "REPARACION",
         "VIDA LIBRE DE VIOLENCIA", "MORIR DIGNAMENTE", "ACCESO A CARGOS PUBLICOS",
-        "BUEN NOMBRE", "NIÑOS", "PETICION", "DIGNIDAD HUMANA",
-        "EDUCACION", "ELEGIR Y SER ELEGIDO", "LIBRE DESARROLLO", "LIBRE EXPRESION", 
-        "LIBERTAD DE EXPRESION", "LIBERTAD DE PRENSA", "RECREACION", "SALUD", "SEGURIDAD PERSONAL",
-        "SEGURIDAD SOCIAL", "SEXUALES Y REPRODUCTIVOS", "ENERGIA ELECTRICA", "TRABAJO",
-        "TRANQUILIDAD", "VIDA", "VISITA INTIMA", "VIVIENDA DIGNA", "INTEGRIDAD FISICA", 
-        "INTEGRIDAD PERSONAL", "UNIDAD FAMILIAR", "IGUALDAD", "MINIMO VITAL", "DIGNIDAD", "FAMILIA", "INTEGRIDAD"
+        "BUEN NOMBRE", "NIÑOS", "PETICION", "DIGNIDAD HUMANA", "EDUCACION", "ELEGIR Y SER ELEGIDO", 
+        "ESTABILIDAD LABORAL", "FAMILIA", "HABEAS DATA", "IDENTIDAD CULTURAL", "IDENTIDAD SEXUAL", 
+        "IGUALDAD", "INTEGRIDAD", "INTERRUPCION VOLUNTARIA", "INTIMIDAD", "LIBERTAD DE CULTO", 
+        "LIBERTAD DE ENSEÑANZA", "LIBERTAD DE EXPRESION", "LIBRE EXPRESION", "LIBERTAD DE INFORMACION", 
+        "LIBERTAD DE LOCOMOCION", "LIBERTAD DE OPINION", "LIBERTAD DE PRENSA", "PROFESION U OFICIO", 
+        "LIBRE DESARROLLO", "MINIMO VITAL", "OBJECION DE CONCIENCIA", "PARTICIPACION EN MATERIA AMBIENTAL", 
+        "PARTICIPACION POLITICA", "PERSONALIDAD JURIDICA", "PROPIEDAD PRIVADA", "RECONOCIMIENTO DE PERSONA", 
+        "RECREACION", "SALUD", "SEGURIDAD PERSONAL", "SEGURIDAD SOCIAL", "SEXUALES Y REPRODUCTIVOS", 
+        "ENERGIA ELECTRICA", "TRABAJO", "TRANQUILIDAD", "VIDA", "VISITA INTIMA", "VIVIENDA DIGNA"
     ]
 
     for frag in fragmentos_brutos:
@@ -335,18 +343,15 @@ if st.session_state['pagina_actual'] == 'cargando':
             "Buscando sentencias relevantes...",
             "Conectando con el servidor jurisprudencial..."
         ]
-        # Elegir un mensaje al azar
         mensaje_actual = random.choice(mensajes_carga)
         
         st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
         barra_carga = st.progress(0)
         
-        # Simulamos la carga visual 
         for porcentaje in range(100):
-            time.sleep(0.015) # Velocidad de la línea (1.5 segundos en total)
+            time.sleep(0.015) 
             barra_carga.progress(porcentaje + 1)
             
-        # Una vez termina, cambiamos al login real
         st.session_state['pagina_actual'] = 'login'
         st.rerun()
 
