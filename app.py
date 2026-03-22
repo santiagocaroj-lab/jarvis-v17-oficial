@@ -328,12 +328,16 @@ if st.session_state['pagina_actual'] == 'bienvenida':
 # =====================================================================
 # PANTALLA INTERMEDIA: LÍNEA DE CARGA (MENSAJES ALEATORIOS)
 # =====================================================================
+# =====================================================================
+# PANTALLA INTERMEDIA: LÍNEA DE CARGA (MENSAJES ALEATORIOS)
+# =====================================================================
 if st.session_state['pagina_actual'] == 'cargando':
     st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         mensajes_carga = [
+            # Originales
             "Buscando en la relatoría de la corte...",
             "Leyendo sobre el realismo jurídico...",
             "Analizando estadísticas...",
@@ -341,7 +345,101 @@ if st.session_state['pagina_actual'] == 'cargando':
             "¿Análisis jurisprudencial? Vamos a ello...",
             "¿Habrá una manera más fácil de hacer línea jurisprudencial?...",
             "Buscando sentencias relevantes...",
-            "Conectando con el servidor jurisprudencial..."
+            "Conectando con el servidor jurisprudencial...",
+            
+            # Analíticas
+            "Explorando la relatoría constitucional...",
+            "Indexando precedentes relevantes...",
+            "Analizando línea jurisprudencial en construcción...",
+            "Cruzando criterios de las altas cortes...",
+            "Revisando subreglas implícitas...",
+            "Interpretando el alcance del precedente...",
+            "Organizando sentencias por relevancia...",
+            "Afinando el análisis jurídico...",
+            "Detectando patrones jurisprudenciales...",
+            "Comparando decisiones clave...",
+            "Evaluando consistencia del precedente...",
+            "Filtrando decisiones contradictorias...",
+            "Leyendo entre líneas del fallo...",
+            "Estructurando la ratio decidendi...",
+            "Separando obiter dicta...",
+            "Reconstruyendo la línea jurisprudencial...",
+            "Buscando coherencia en las decisiones...",
+            "Consultando criterios reiterados...",
+            "Identificando sentencias hito...",
+            "Analizando evolución doctrinal...",
+            "Interpretando el bloque de constitucionalidad...",
+            "Ajustando el mapa jurisprudencial...",
+            "Rastreando cambios de postura...",
+            "Validando argumentos jurídicos...",
+            "Sistematizando información judicial...",
+            "Detectando tensiones interpretativas...",
+            "Buscando el precedente dominante...",
+            "Clasificando derechos involucrados...",
+            "Estimando impacto de la decisión...",
+            "Refinando resultados del análisis...",
+            
+            # Creativas / Ligeras
+            "Preparando café jurídico ☕...",
+            "Afinando la toga digital...",
+            "Desempolvando precedentes olvidados...",
+            "Preguntándole a la Corte '¿y esto cómo era?'...",
+            "Haciendo magia con jurisprudencia...",
+            "Invocando el espíritu del precedente...",
+            "Traduciendo lenguaje jurídico a lógica...",
+            "Buscando esa sentencia que lo cambia todo...",
+            "Ordenando el caos jurisprudencial...",
+            "Pensando como magistrado por un momento...",
+            
+            # Técnicas / Serias
+            "Ejecutando análisis de consistencia jurisprudencial...",
+            "Procesando relaciones entre precedentes...",
+            "Evaluando jerarquía de decisiones...",
+            "Optimizando el rastreo de sentencias...",
+            "Analizando criterios de unificación...",
+            "Procesando estructura argumentativa del fallo...",
+            
+            # Divertidas / Humorísticas
+            "Consultando a la Corte... (modo intenso activado)",
+            "Convenciendo a la jurisprudencia de que coopere...",
+            "Negociando con precedentes rebeldes...",
+            "Buscando esa sentencia que todos citan pero nadie ha leído...",
+            "Traduciendo 'lenguaje jurídico' a 'lenguaje humano'...",
+            "Revisando si el magistrado estaba de buen humor ese día...",
+            "Detectando contradicciones... y fingiendo sorpresa",
+            "Intentando que todo esto tenga sentido...",
+            "Leyendo la sentencia completa... sí, completa 😅",
+            "Analizando… o al menos eso parece",
+            "Espera, esto se puso interesante...",
+            "¿Ratio decidendi o improvisación elegante?",
+            "Preguntándole al precedente '¿tú qué opinas?'...",
+            "Cruzando los dedos para que haya coherencia...",
+            "Esto claramente necesita más café ☕",
+            "Buscando la lógica... seguimos buscando...",
+            "¿Otra subregla? Claro, ¿por qué no?",
+            "Organizando el caos (intento #3)...",
+            "Simulando entender todo a la primera...",
+            "¿Seguro que esto no podía ser más simple?",
+            "Releyendo por tercera vez... por si acaso",
+            "Cuando creías que ya habías terminado... aparece otra sentencia",
+            "Insertando cara seria de análisis jurídico...",
+            "Ejecutando 'modo abogado': depende",
+            "Analizando excepciones de las excepciones...",
+            "Este argumento tiene potencial... o eso esperamos",
+            "Si esto encaja, será un milagro jurídico",
+            "Compilando sabiduría judicial... paciencia...",
+            "Verificando si esto ya lo había dicho la Corte antes (spoiler: sí)",
+            "¿Línea jurisprudencial o montaña rusa? 🎢",
+            "Esto merece un pie de página… largo",
+            "Buscando coherencia… versión extendida",
+            "Plot twist: hay otra interpretación",
+            "A ver, a ver… esto no estaba en el resumen",
+            "Analizando con fe y jurisprudencia",
+            "Cargando argumentos... algunos más sólidos que otros",
+            "Reconciliando decisiones que claramente no se hablan entre sí",
+            "Aplicando lógica jurídica… con optimismo",
+            "¿Quién redactó esto y por qué tan largo?",
+            "Interpretando lo que el magistrado 'quiso decir'"
         ]
         mensaje_actual = random.choice(mensajes_carga)
         
@@ -354,7 +452,6 @@ if st.session_state['pagina_actual'] == 'cargando':
             
         st.session_state['pagina_actual'] = 'login'
         st.rerun()
-
 # =====================================================================
 # PANTALLA 2: FIREWALL DE SEGURIDAD (LOGIN)
 # =====================================================================
