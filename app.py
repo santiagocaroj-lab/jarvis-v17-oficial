@@ -22,6 +22,11 @@ st.markdown("""
         0% { opacity: 0; transform: translateY(40px); }
         100% { opacity: 1; transform: translateY(0); }
     }
+    
+    @keyframes fadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
 
     /* --- ESTILOS DE PÁGINA DE BIENVENIDA --- */
     .welcome-wrapper {
@@ -117,6 +122,23 @@ st.markdown("""
     }
     .param-box b, .param-box li, .param-box ul {
         color: #000000 !important;
+    }
+    
+    /* --- ESTILOS PARA IMAGEN DE LOGIN --- */
+    div[data-testid="stTextInput"] {
+        position: relative;
+        z-index: 1; /* Mantiene la barra de texto por encima de la imagen */
+    }
+    .login-img-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -85%); /* Sube los personajes justo encima del input */
+        width: 140%; /* Compensa el espacio muerto a los lados */
+        opacity: 0;
+        animation: fadeIn 1.5s ease 0.3s forwards; /* Fade in con ligero retraso */
+        z-index: 0;
+        pointer-events: none; /* Permite hacer clic a través de la imagen */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -363,6 +385,19 @@ if st.session_state['pagina_actual'] == 'login':
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.info("Por favor, identifícate para acceder al motor de análisis.")
+        
+        # --- CARGA E INYECCIÓN DE LA IMAGEN DE LOGIN CON FADE IN ---
+        nombre_imagen_login = "IMAGEN (3).png"
+        if os.path.exists(nombre_imagen_login):
+            with open(nombre_imagen_login, "rb") as image_file:
+                encoded_login = base64.b64encode(image_file.read()).decode()
+            st.markdown(f"""
+                <div style="position: relative; width: 100%; height: 0px; z-index: 0;">
+                    <img src="data:image/png;base64,{encoded_login}" class="login-img-container">
+                </div>
+                """, unsafe_allow_html=True)
+        # -----------------------------------------------------------
+
         clave = st.text_input("Ingrese la clave de seguridad:", type="password")
         if st.button("INGRESAR"):
             if clave == "Juan007":
