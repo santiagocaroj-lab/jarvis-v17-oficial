@@ -227,7 +227,7 @@ def motor_juridico_final(pdf_file):
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL", "DEFENSORA DE DERECHOS", "DEFENSOR DE DERECHOS"]: calidad = "LÍDER SOCIAL"
 
-    # D. EXTRACCIÓN DERECHOS VULNERADOS (REESCRITURA Y LIMPIEZA EXTREMA)
+    # D. EXTRACCIÓN DERECHOS VULNERADOS
     derechos_encontrados = set()
     patrones_derecho = [
         r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n|\||T-|Expediente)",
@@ -241,7 +241,6 @@ def motor_juridico_final(pdf_file):
         for m in re.finditer(p, texto_limpio, re.IGNORECASE):
             fragmentos_brutos.append(m.group(1).upper())
 
-    # Frases que cortan la oración porque ya no es la lista de derechos
     cortes_basura = [
         " CON FIN", " CON EL FIN", " PARA QUE", " SOLICITANDO", " MEDIANTE", " POR PARTE", 
         " HASTA", " A FIN DE", " CONTRA", " CON EL PROPOSITO", " Y EN CONSECUENCIA", 
@@ -249,7 +248,6 @@ def motor_juridico_final(pdf_file):
         " AL QUE", " ORDENAR", " CUMPLA"
     ]
     
-    # Palabras que deben borrarse de los fragmentos pequeños (El filtro de "RESPETÓ SU DE")
     basura_palabras = ["LA", "EL", "LOS", "LAS", "QUE", "SU", "SUS", "DE", "DEL", "AL", "A", "EN", "POR", "CON", "PARA", "RESPETO", "RESPETÓ", "GARANTICE", "PROTEJA", "ORDENE", "TUTELA", "AMPARO"]
     
     DERECHOS_MAESTROS = [
@@ -278,7 +276,6 @@ def motor_juridico_final(pdf_file):
         for d in partes:
             d_clean = d.replace("FUNDAMENTALES", "").replace("FUNDAMENTAL", "").replace("DERECHOS", "").replace("DERECHO", "").strip()
             palabras = d_clean.split()
-            # Quitamos todas las palabras basura (ej: RESPETÓ, SU, DE)
             d_clean = " ".join([w for w in palabras if w not in basura_palabras])
             
             if len(d_clean) >= 3 and not any(bad in d_clean for bad in ["DEMANDAD", "ACCION", "RESPUESTA", "JUZGADO", "SENTENCIA", "ACTOR"]):
@@ -289,7 +286,6 @@ def motor_juridico_final(pdf_file):
                         encontrado = True
                         break
                 
-                # Si no estaba en el maestro pero quedó limpio y tiene sentido (menos de 30 letras)
                 if not encontrado and len(d_clean) < 30: 
                     derechos_encontrados.add(d_clean)
 
@@ -461,73 +457,63 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                 for f in files_comp:
                     info = motor_juridico_final(f)
                     fallos = []
-                    aciertos = 0
                     
-                    # --- CHECK 1: CALIDAD ---
+                    # --- REGLA ESTRICTA: ESCENARIO (Sujeto + Objeto) ---
+                    match_calidad = False
                     calidad_limpia_info = limpiar_texto_usuario(info['calidad'])
                     calidad_limpia_final = limpiar_texto_usuario(ext_base['calidad'])
-                    
                     if calidad_limpia_final in calidad_limpia_info or calidad_limpia_info in calidad_limpia_final:
-                        aciertos += 1
+                        match_calidad = True
                     else:
                         fallos.append(f"Calidad difiere")
                     
-                    # --- CHECK 2: ACCIONADO ---
+                    match_accionado = False
                     acc_base = limpiar_texto_usuario(ext_base["accionado"])
                     acc_comp = limpiar_texto_usuario(info["accionado"])
                     siglas_base = generar_siglas(acc_base)
                     siglas_comp = generar_siglas(acc_comp)
-                    
-                    coincidencia_accionado = False
                     if (len(acc_base) > 2 and len(acc_comp) > 2 and (acc_base in acc_comp or acc_comp in acc_base)) or \
                        (len(siglas_base) >= 2 and siglas_base in acc_comp) or \
                        (len(siglas_comp) >= 2 and siglas_comp in acc_base) or \
                        (len(siglas_base) >= 2 and siglas_base == siglas_comp):
-                        coincidencia_accionado = True
-                            
-                    if coincidencia_accionado:
-                        aciertos += 1
+                        match_accionado = True
                     else:
                         fallos.append(f"Accionado difiere")
                         
                     # --- CHECK 3: DERECHO (PRESUNCIÓN DE RELEVANCIA) ---
+                    match_derecho = False
                     derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
-                    coincidencia_derecho = False
                     
                     if ext_base['derechos'] == ["NO IDENTIFICADO"]:
-                        aciertos += 1
-                        coincidencia_derecho = True
+                        match_derecho = True
                     else:
                         for d_base in derechos_base_limpios:
                             if d_base == "NO IDENTIFICADO": continue
                             for d_info in derechos_info_limpios:
                                 if d_base in d_info or d_info in d_base:
-                                    coincidencia_derecho = True
+                                    match_derecho = True
                                     break
-                            if coincidencia_derecho: break
+                            if match_derecho: break
                             
-                        if coincidencia_derecho:
-                            aciertos += 1
-                        else:
+                        if not match_derecho:
                             fallos.append("Derecho difiere")
 
-                    # --- VEREDICTO FINAL POR SEMÁFORO ---
-                    if aciertos == 3:
-                        estado = "✅ INCLUIDA"
-                    elif aciertos == 2:
-                        estado = "⚠️ PRESUNTAMENTE FUNCIONAL: RECOMIENDO REVISIÓN MANUAL"
-                    else:
+                    # --- VEREDICTO FINAL (Semáforo Estricto del Escenario) ---
+                    if not match_calidad or not match_accionado:
                         estado = "❌ EXCLUIDA"
+                    elif match_calidad and match_accionado and match_derecho:
+                        estado = "✅ INCLUIDA"
+                    elif match_calidad and match_accionado and not match_derecho:
+                        estado = "⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
                         
                     resultados.append({
                         "Archivo": f.name,
-                        "Aciertos": f"{aciertos}/3",
                         "Accionante": info['accionante'],
                         "Calidad Evaluada": info['calidad'],
                         "Accionado Evaluado": info["accionado"],
                         "Derechos Evaluados": ", ".join(info['derechos']),
                         "Veredicto": estado,
-                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple los 3 criterios"
+                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple todos los criterios"
                     })
                 
                 st.session_state['resultados_df'] = pd.DataFrame(resultados)
@@ -542,14 +528,14 @@ if st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth'
                 pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA (ARQUIMÉDICA):\nSujeto (Calidad): {ext_base['calidad']}\nObjeto (Accionado): {ext_base['accionado']}\nTema (Derecho): {', '.join(ext_base['derechos'])}\n" + "="*50))
                 
                 for r in resultados:
-                    if "INCLUIDA" in r["Veredicto"]:
+                    if "✅" in r["Veredicto"]:
                         pdf.set_fill_color(220, 255, 220)
-                    elif "PRESUNTAMENTE" in r["Veredicto"]:
+                    elif "⚠️" in r["Veredicto"]:
                         pdf.set_fill_color(255, 255, 153)
                     else:
                         pdf.set_fill_color(255, 220, 220)
                         
-                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']} ({r['Aciertos']} Aciertos)"), 1, 1, 'L', True)
+                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
                     pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
                     pdf.ln(2)
 
@@ -677,7 +663,6 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                 derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
                 alerta_derecho = ""
                 
-                # Revisar si el derecho del usuario cruzó con la Arquimédica
                 if param_u_der and param_u_der != "NO APLICA":
                     encontrado = False
                     for d_base in derechos_base_limpios:
@@ -726,86 +711,79 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                 for f in files_comp_g:
                     info = motor_juridico_final(f)
                     fallos = []
-                    aciertos = 0
                     
-                    # --- CHECK 1: CALIDAD ---
+                    # --- REGLA ESTRICTA: ESCENARIO (Sujeto + Objeto) ---
+                    match_calidad = False
                     calidad_limpia_info = limpiar_texto_usuario(info['calidad'])
                     calidad_limpia_final = limpiar_texto_usuario(final_calidad)
-                    
                     if calidad_limpia_final in calidad_limpia_info or calidad_limpia_info in calidad_limpia_final:
-                        aciertos += 1
+                        match_calidad = True
                     else:
                         fallos.append(f"Calidad difiere ({info['calidad']})")
                     
-                    # --- CHECK 2: ACCIONADO ---
+                    match_accionado = False
                     acc_comp = limpiar_texto_usuario(info["accionado"])
                     siglas_comp = generar_siglas(acc_comp)
-                    coincidencia_accionado = False
                     
                     if partes_accionado_u:
                         for parte in partes_accionado_u:
                             if len(parte) > 2:
                                 sigla_parte = generar_siglas(parte)
                                 if parte in acc_comp or acc_comp in parte or (len(sigla_parte) >= 2 and sigla_parte in acc_comp) or (len(siglas_comp) >= 2 and siglas_comp in parte):
-                                    coincidencia_accionado = True
+                                    match_accionado = True
                                     break
                     else:
                         acc_base = limpiar_texto_usuario(ext_base['accionado'])
                         siglas_base = generar_siglas(acc_base)
-                        if (len(acc_base) > 2 and len(acc_comp) > 2 and (acc_base in acc_comp or acc_comp in acc_base)) or (len(siglas_base) >= 2 and siglas_base in acc_comp) or (len(siglas_comp) >= 2 and siglas_comp in acc_base) or (len(siglas_base) >= 2 and siglas_base == siglas_comp):
-                            coincidencia_accionado = True
+                        if (len(acc_base) > 2 and len(acc_comp) > 2 and (acc_base in acc_comp or acc_comp in acc_base)) or \
+                           (len(siglas_base) >= 2 and siglas_base in acc_comp) or \
+                           (len(siglas_comp) >= 2 and siglas_comp in acc_base) or \
+                           (len(siglas_base) >= 2 and siglas_base == siglas_comp):
+                            match_accionado = True
                             
-                    if coincidencia_accionado:
-                        aciertos += 1
-                    else:
+                    if not match_accionado:
                         fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
                         
                     # --- CHECK 3: DERECHO (PRESUNCIÓN DE RELEVANCIA) ---
+                    match_derecho = False
                     derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
-                    coincidencia_derecho = False
                     
                     if ext_base['derechos'] == ["NO IDENTIFICADO"] and (not param_u_der or param_u_der == "NO APLICA"):
-                        aciertos += 1
-                        coincidencia_derecho = True
+                        match_derecho = True
                     else:
-                        # 1. Presunción de relevancia: buscar al menos 1 derecho de la arquimédica en la comparada
                         for d_base in derechos_base_limpios:
                             if d_base == "NO IDENTIFICADO": continue
                             for d_info in derechos_info_limpios:
                                 if d_base in d_info or d_info in d_base:
-                                    coincidencia_derecho = True
+                                    match_derecho = True
                                     break
-                            if coincidencia_derecho: break
+                            if match_derecho: break
                         
-                        # 2. Si no cruzó la base, pero el usuario dio un parámetro guía y ESE cruza, lo valemos
-                        if not coincidencia_derecho and param_u_der and param_u_der != "NO APLICA":
+                        if not match_derecho and param_u_der and param_u_der != "NO APLICA":
                             for d_info in derechos_info_limpios:
                                 if param_u_der in d_info or d_info in param_u_der:
-                                    coincidencia_derecho = True
+                                    match_derecho = True
                                     break
 
-                        if coincidencia_derecho:
-                            aciertos += 1
-                        else:
+                        if not match_derecho:
                             fallos.append("Derecho difiere")
 
-                    # --- VEREDICTO FINAL POR SEMÁFORO ---
-                    if aciertos == 3:
-                        estado = "✅ INCLUIDA"
-                    elif aciertos == 2:
-                        estado = "⚠️ PRESUNTAMENTE FUNCIONAL: RECOMIENDO REVISIÓN MANUAL"
-                    else:
+                    # --- VEREDICTO FINAL (Semáforo Estricto del Escenario) ---
+                    if not match_calidad or not match_accionado:
                         estado = "❌ EXCLUIDA"
+                    elif match_calidad and match_accionado and match_derecho:
+                        estado = "✅ INCLUIDA"
+                    elif match_calidad and match_accionado and not match_derecho:
+                        estado = "⚠️ INCLUIDA (El derecho no coincide, pero el escenario es muy similar)"
                         
                     resultados.append({
                         "Archivo": f.name,
-                        "Aciertos": f"{aciertos}/3",
                         "Accionante": info['accionante'],
                         "Calidad Evaluada": info['calidad'],
                         "Accionado Evaluado": info["accionado"],
                         "Derechos Evaluados": ", ".join(info['derechos']),
                         "Veredicto": estado,
-                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple los 3 criterios"
+                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple todos los criterios"
                     })
                 
                 st.session_state['resultados_df_g'] = pd.DataFrame(resultados)
@@ -820,14 +798,14 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                 pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA:\nSujeto (Calidad): {final_calidad}\nObjeto (Accionado): {final_accionado_display}\nTema (Derecho): {final_derecho_display.replace('<br><small>','').replace('</small>','')}\n" + "="*50))
                 
                 for r in resultados:
-                    if "INCLUIDA" in r["Veredicto"]:
-                        pdf.set_fill_color(220, 255, 220) # Verde
-                    elif "PRESUNTAMENTE" in r["Veredicto"]:
-                        pdf.set_fill_color(255, 255, 153) # Amarillo
+                    if "✅" in r["Veredicto"]:
+                        pdf.set_fill_color(220, 255, 220) 
+                    elif "⚠️" in r["Veredicto"]:
+                        pdf.set_fill_color(255, 255, 153) 
                     else:
-                        pdf.set_fill_color(255, 220, 220) # Rojo
+                        pdf.set_fill_color(255, 220, 220) 
                         
-                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']} ({r['Aciertos']} Aciertos)"), 1, 1, 'L', True)
+                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']}"), 1, 1, 'L', True)
                     pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Evaluados']}\nCalidad: {r['Calidad Evaluada']}\nAccionado: {r['Accionado Evaluado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Motivo (Fallas)']}\n" + "-"*80))
                     pdf.ln(2)
 
