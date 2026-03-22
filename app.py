@@ -11,6 +11,18 @@ import unicodedata
 # --- 1. CONFIGURACIÓN Y ESTILOS VISUALES ---
 st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide")
 
+# --- SISTEMA DE CACHÉ PARA ELIMINAR EL LAG VISUAL ---
+@st.cache_data(show_spinner=False)
+def cargar_imagen_base64(ruta):
+    if os.path.exists(ruta):
+        with open(ruta, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    return ""
+
+# Precargamos las imágenes en la memoria RAM para transiciones instantáneas
+img_logo_b64 = cargar_imagen_base64("Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png")
+img_login_b64 = cargar_imagen_base64("IMAGEN 4.png")
+
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
@@ -150,7 +162,7 @@ st.markdown("""
         width: auto; 
         object-fit: contain;
         opacity: 0;
-        animation: fadeIn 1.5s ease 0.3s forwards; 
+        animation: fadeIn 1.2s ease 0.1s forwards; 
         z-index: 999; 
         pointer-events: none; 
     }
@@ -360,12 +372,9 @@ def highlight_veredicto(val):
 # PANTALLA 1: BIENVENIDA (ECOMODA)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'bienvenida':
-    nombre_imagen = "Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png"
     img_html = ""
-    if os.path.exists(nombre_imagen):
-        with open(nombre_imagen, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-        img_html = f"<img src='data:image/png;base64,{encoded_string}' width='140' style='border-radius: 10px;'>"
+    if img_logo_b64:
+        img_html = f"<img src='data:image/png;base64,{img_logo_b64}' width='140' style='border-radius: 10px;'>"
 
     st.markdown(f"""
         <div class='welcome-wrapper'>
@@ -392,18 +401,15 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     st.stop()
 
 # =====================================================================
-# PANTALLA 2: FIREWALL DE SEGURIDAD (CON FORMULARIO PARA TECLA ENTER)
+# PANTALLA 2: FIREWALL DE SEGURIDAD (CON FORMULARIO Y SIN LAG)
 # =====================================================================
 if st.session_state['pagina_actual'] == 'login':
     st.markdown("<div class='main-title'>🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     
-    # --- IMAGEN ANCLADA Y EN CAPA SUPERIOR ---
-    nombre_imagen_login = "IMAGEN 4.png"
-    if os.path.exists(nombre_imagen_login):
-        with open(nombre_imagen_login, "rb") as image_file:
-            encoded_login = base64.b64encode(image_file.read()).decode()
+    # --- IMAGEN ANCLADA Y EN CAPA SUPERIOR (Carga instantánea) ---
+    if img_login_b64:
         st.markdown(f"""
-            <img src="data:image/png;base64,{encoded_login}" class="login-img-container">
+            <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
             """, unsafe_allow_html=True)
     # -----------------------------------------
 
