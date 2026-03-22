@@ -45,6 +45,11 @@ st.markdown("""
         0% { opacity: 0; }
         100% { opacity: 1; }
     }
+    @keyframes fadeOut {
+        0% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+    .fade-out-anim { animation: fadeOut 1s forwards !important; }
     
     /* --- ESTILOS DE PÁGINA DE BIENVENIDA --- */
     .welcome-wrapper {
@@ -73,6 +78,9 @@ st.markdown("""
 
     .btn-guiado>button { background-color: #0f172a; color: #ffc106; border: 2px solid #ffc106; }
     .btn-guiado>button:hover { background-color: #ffc106; color: #0f172a; }
+    .btn-back>button { background-color: white; color: black; border: 2px solid #ccc; height: 40px; font-size: 12px; margin-bottom: 15px; }
+    .btn-back>button:hover { background-color: #f0f0f0; color: black; transform: scale(1.02); }
+
     .guide-button {
         display: flex; align-items: center; justify-content: center; background-color: transparent; color: #ffc106; border: 2px solid #ffc106; font-weight: bold; width: 100%; height: auto;
         padding: 12px 10px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease; border-radius: 8px; text-decoration: none; margin-top: 15px; font-size: 13px;
@@ -81,11 +89,17 @@ st.markdown("""
     .param-box { background-color: #f8f9fa; border: 2px solid #ffc106; padding: 20px; border-radius: 10px; margin-bottom: 25px; color: #000000 !important; }
     .param-box b, .param-box li, .param-box ul { color: #000000 !important; }
 
-    /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA Y FORMULARIO --- */
-    div[data-testid="stTextInput"], .stButton, div[data-testid="stFormSubmitButton"] { position: relative; z-index: 10; }
+    /* --- ESTILOS PARA IMAGEN DE LOGIN (Corregido para no solaparse con sidebar) --- */
+    div[data-testid="stTextInput"], div[data-testid="stFormSubmitButton"] { position: relative; z-index: 10; }
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
-    .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0;
-        animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
+    
+    .login-wrapper { position: relative; min-height: 80vh; width: 100%; }
+    .login-img-container { 
+        position: absolute; bottom: 0; right: 0; 
+        height: 80vh; width: auto; object-fit: contain; 
+        opacity: 0; animation: fadeIn 1.2s ease 0.1s forwards; 
+        z-index: 0; pointer-events: none; 
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -113,6 +127,7 @@ if 'pagina_actual' not in st.session_state: st.session_state['pagina_actual'] = 
 if 'auth' not in st.session_state: st.session_state['auth'] = False
 if 'uploader_key' not in st.session_state: st.session_state['uploader_key'] = 0
 if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = None
+if 'fade_out' not in st.session_state: st.session_state['fade_out'] = False
 
 # Variables para controlar que la música inicie solo al interactuar
 if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
@@ -379,6 +394,10 @@ def motor_juridico_final(pdf_file):
 
 # PANTALLA 1: BIENVENIDA (ECOMODA)
 if st.session_state['pagina_actual'] == 'bienvenida':
+    # Si fade_out es True, aplicamos la clase de animación css para desvanecer toda la vista
+    fade_class = "fade-out-anim" if st.session_state.get('fade_out') else ""
+    st.markdown(f"<div class='{fade_class}'>", unsafe_allow_html=True)
+    
     img_html = ""
     if img_logo_b64:
         img_html = f"<img src='data:image/png;base64,{img_logo_b64}' width='140' style='border-radius: 10px;'>"
@@ -396,19 +415,27 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button(" 🚀  INGRESAR AL SISTEMA"):
-            # AQUÍ ARRANCA EL SONIDO POR PRIMERA VEZ (Activado por clic humano)
+            # AQUÍ ARRANCA EL SONIDO (1/4 botones que suenan)
             st.session_state['musica_activa'] = True
             st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
             st.session_state['sfx_pendiente'] = "Boton1.mp3"
-            st.session_state['pagina_actual'] = 'cargando'
+            st.session_state['fade_out'] = True
             st.rerun()
 
-    # Este bloque solo renderiza si estamos estrictamente en bienvenida
     st.markdown("""
         <a href='https://www.researchgate.net/publication/359064966_Linea_Jurisprudencial_en_8_simples_pasos' target='_blank' class='guide-button'>
             📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
         </a>
     """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Lógica de espera para el fade out antes de pasar a la pantalla de carga
+    if st.session_state.get('fade_out'):
+        time.sleep(1)
+        st.session_state['fade_out'] = False
+        st.session_state['pagina_actual'] = 'cargando'
+        st.rerun()
 
 # PANTALLA INTERMEDIA: LÍNEA DE CARGA
 elif st.session_state['pagina_actual'] == 'cargando':
@@ -433,7 +460,9 @@ elif st.session_state['pagina_actual'] == 'cargando':
 
 # PANTALLA 2: FIREWALL DE SEGURIDAD (LOGIN)
 elif st.session_state['pagina_actual'] == 'login':
+    st.markdown("<div class='login-wrapper'>", unsafe_allow_html=True)
     st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
+    
     if img_login_b64:
         st.markdown(f"""
         <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
@@ -441,12 +470,19 @@ elif st.session_state['pagina_actual'] == 'login':
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
+        st.markdown("<div class='btn-back'>", unsafe_allow_html=True)
+        if st.button("🔙 Volver a la Bienvenida"):
+            st.session_state['pagina_actual'] = 'bienvenida'
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
         st.info("Por favor, identifícate para acceder al motor de análisis.")
         with st.form(key='login_form', clear_on_submit=False):
             clave = st.text_input("Ingrese la clave de seguridad:", type="password")
             submit_button = st.form_submit_button("INGRESAR")
             if submit_button:
                 if clave == "Juan007":
+                    # AQUÍ ARRANCA EL SONIDO (2/4 botones que suenan)
                     st.session_state['sfx_pendiente'] = "Boton2.mp3"
                     # Al pasar de la zona de ingreso al análisis, se cambia la pista
                     st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
@@ -455,6 +491,7 @@ elif st.session_state['pagina_actual'] == 'login':
                     st.rerun()
                 else:
                     st.error("Acceso denegado. Clave incorrecta.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # PANTALLA 3: GARZÓN (MODO AUTOMÁTICO)
 elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth']:
@@ -469,7 +506,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
     col_nav1, col_nav2 = st.columns([1, 1])
     with col_nav1:
         if st.button(" 🚪 Cerrar Sesión / Volver a ECOMODA"):
-            st.session_state['sfx_pendiente'] = "Boton3.mp3"
             st.session_state['musica_activa'] = False # Silencia la música al salir
             st.session_state['auth'] = False
             st.session_state['pagina_actual'] = 'bienvenida'
@@ -477,7 +513,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
     with col_nav2:
         st.markdown("<div class='btn-guiado'>", unsafe_allow_html=True)
         if st.button(" 🛠️ IR AL MODO GUIADO (INGRESAR PARÁMETROS)"):
-            st.session_state['sfx_pendiente'] = "Boton1.mp3"
             st.session_state['pagina_actual'] = 'app_garzon_guiado'
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -510,7 +545,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
     col_btn1, col_btn2 = st.columns(2)
     with col_btn2:
         if st.button(" 🧹 LIMPIAR DATOS (Empezar de nuevo)"):
-            st.session_state['sfx_pendiente'] = "Boton3.mp3"
             st.session_state['analisis_terminado'] = False
             st.session_state['uploader_key'] += 1 
             st.rerun()
@@ -518,7 +552,8 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
     with col_btn1:
         ejecutar = st.button(" 🚀 EJECUTAR ANÁLISIS AUTOMÁTICO")
         if ejecutar:
-            st.session_state['sfx_pendiente'] = "Boton2.mp3"
+            # AQUÍ ARRANCA EL SONIDO (3/4 botones que suenan)
+            st.session_state['sfx_pendiente'] = "Boton1.mp3"
             if not file_arq or not files_comp:
                 st.error("Faltan archivos para procesar.")
             else:
@@ -637,7 +672,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
     st.markdown("<div class='main-title'>GARZÓN - MODO GUIADO (INGRESO MANUAL DE PARÁMETROS)</div>", unsafe_allow_html=True)
     
     if st.button(" 🔙 Volver al Modo Automático"):
-        st.session_state['sfx_pendiente'] = "Boton2.mp3"
         st.session_state['pagina_actual'] = 'app_garzon'
         st.rerun()
         
@@ -709,7 +743,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
     col_btn1_g, col_btn2_g = st.columns(2)
     with col_btn2_g:
         if st.button(" 🧹 LIMPIAR DATOS", key="limpiar_g"):
-            st.session_state['sfx_pendiente'] = "Boton3.mp3"
             st.session_state['analisis_terminado_g'] = False
             st.session_state['uploader_key'] += 1 
             st.rerun()
@@ -717,7 +750,8 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
     with col_btn1_g:
         ejecutar_g = st.button(" 🚀 EJECUTAR ANÁLISIS GUIADO", key="exec_g")
         if ejecutar_g:
-            st.session_state['sfx_pendiente'] = "Boton2.mp3"
+            # AQUÍ ARRANCA EL SONIDO (4/4 botones que suenan)
+            st.session_state['sfx_pendiente'] = "Boton1.mp3"
             if not file_arq_g or not files_comp_g:
                 st.error("Faltan archivos para procesar.")
             else:
