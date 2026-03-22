@@ -227,37 +227,86 @@ def motor_juridico_final(pdf_file):
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL", "DEFENSORA DE DERECHOS", "DEFENSOR DE DERECHOS"]: calidad = "LÍDER SOCIAL"
 
-    # D. EXTRACCIÓN DERECHOS VULNERADOS
-    derechos_encontrados = []
+    # D. EXTRACCIÓN DERECHOS VULNERADOS (NUEVO FILTRO INTELIGENTE Y REESCRITURA)
+    derechos_encontrados = set()
     patrones_derecho = [
         r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n|\||T-|Expediente)",
         r"(?:vulnerar|vulneró|amenazó|violó|transgredió|vulneración|amenaza)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
-        r"(?:amparo|protección)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
+        r"(?:amparo|protección|garantía)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
         r"(?:tutela|amparo)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)"
     ]
     
-    texto_derechos = ""
+    fragmentos_brutos = []
     for p in patrones_derecho:
-        m = re.search(p, texto_limpio, re.IGNORECASE)
-        if m:
-            texto_derechos = m.group(1).strip()
-            break
-            
-    if texto_derechos:
-        texto_derechos = re.sub(r'\s+y\s+', ',', texto_derechos, flags=re.IGNORECASE)
-        texto_derechos = re.sub(r'\s+e\s+', ',', texto_derechos, flags=re.IGNORECASE)
-        partes = [d.strip().upper() for d in texto_derechos.split(',') if len(d.strip()) > 3]
+        for m in re.finditer(p, texto_limpio, re.IGNORECASE):
+            fragmentos_brutos.append(m.group(1).upper())
+
+    # Frases que indican que la lista de derechos terminó y empieza la petición o relato
+    cortes_basura = [
+        " CON FIN", " CON EL FIN", " PARA QUE", " SOLICITANDO", " MEDIANTE", " POR PARTE", 
+        " HASTA", " A FIN DE", " CONTRA", " CON EL PROPOSITO", " Y EN CONSECUENCIA", 
+        " SE LE ORDENE", " EN SEDE", " QUE SE", " PIDIENDO", " CON EL OBJETO", " AL DEBIDO",
+        " AL QUE"
+    ]
+    
+    # El diccionario de la Corte para reescribir limpiamente
+    DERECHOS_MAESTROS = [
+        "ADMINISTRACION DE JUSTICIA", "TIERRA", "AGUA POTABLE", "AMBIENTE SANO",
+        "ASOCIACION SINDICAL", "AYUDA HUMANITARIA", "CONSULTA PREVIA", "DEBIDO PROCESO",
+        "CAPACIDAD JURIDICA", "HONRA", "NACIONALIDAD", "PAZ", "REPARACION",
+        "VIDA LIBRE DE VIOLENCIA", "MORIR DIGNAMENTE", "ACCESO A CARGOS PUBLICOS",
+        "BUEN NOMBRE", "NIÑOS", "PETICION", "DIGNIDAD HUMANA",
+        "EDUCACION", "ELEGIR Y SER ELEGIDO", "LIBRE DESARROLLO", "LIBRE EXPRESION", 
+        "LIBERTAD DE EXPRESION", "LIBERTAD DE PRENSA", "RECREACION", "SALUD", "SEGURIDAD PERSONAL",
+        "SEGURIDAD SOCIAL", "SEXUALES Y REPRODUCTIVOS", "ENERGIA ELECTRICA", "TRABAJO",
+        "TRANQUILIDAD", "VIDA", "VISITA INTIMA", "VIVIENDA DIGNA", "INTEGRIDAD FISICA", 
+        "INTEGRIDAD PERSONAL", "UNIDAD FAMILIAR", "IGUALDAD", "MINIMO VITAL", "DIGNIDAD", "FAMILIA", "INTEGRIDAD"
+    ]
+
+    for frag in fragmentos_brutos:
+        # Cortar basura (órdenes del juez, solicitudes, etc)
+        for corte in cortes_basura:
+            if corte in frag:
+                frag = frag.split(corte)[0]
+                
+        # Cambiar conectores por comas para separar bien el listado de derechos
+        frag = re.sub(r'\s+Y\s+', ',', frag)
+        frag = re.sub(r'\s+E\s+', ',', frag)
+        frag = re.sub(r'\s+O\s+', ',', frag)
+        partes = [d.strip() for d in frag.split(',')]
         
-        basura = ["LA", "EL", "LOS", "LAS", "QUE", "SU", "SUS", "DE"]
         for d in partes:
-            d_clean = " ".join([w for w in d.split() if w not in basura])
-            if len(d_clean) > 3 and "ACCION" not in d_clean:
-                derechos_encontrados.append(d_clean)
+            # Limpiar palabras innecesarias para dejar el derecho puro
+            d_clean = d.replace("FUNDAMENTALES", "").replace("FUNDAMENTAL", "").replace("DERECHOS", "").replace("DERECHO", "").replace("AL ", "").replace("A LA ", "").replace("A ", "").strip()
+            
+            # Evitar basura residual (como nombres de juzgados o verbos)
+            if len(d_clean) >= 3 and not any(bad in d_clean for bad in ["DEMANDAD", "ACCION", "RESPUESTA", "JUZGADO", "SENTENCIA", "TUTELA", "AMPARO", "ACTOR"]):
                 
+                # REESCRITURA: Cruzar con los maestros de la Corte para limpiarlo perfecto
+                encontrado = False
+                for dm in DERECHOS_MAESTROS:
+                    if dm in d_clean or d_clean in dm:
+                        derechos_encontrados.add(dm)
+                        encontrado = True
+                        break
+                
+                # Si no está en el maestro pero parece válido y no es una oración gigante, lo agregamos
+                if not encontrado and len(d_clean) < 30: 
+                    derechos_encontrados.add(d_clean)
+
+    # BARRIDO DE EMERGENCIA (Sonar estadístico de Derechos)
+    # Si todo falló, buscar directamente en los hechos/antecedentes (primeras páginas)
     if not derechos_encontrados:
-        derechos_encontrados = ["NO IDENTIFICADO"]
+        texto_inicio = texto_limpio[:5000].upper() 
+        for dm in DERECHOS_MAESTROS:
+            if re.search(rf"\b{dm}\b", texto_inicio):
+                derechos_encontrados.add(dm)
                 
-    return {"accionante": accionante, "calidad": calidad, "accionado": accionado, "derechos": derechos_encontrados}
+    derechos_finales = list(derechos_encontrados)
+    if not derechos_finales:
+        derechos_finales = ["NO IDENTIFICADO"]
+                
+    return {"accionante": accionante, "calidad": calidad, "accionado": accionado, "derechos": derechos_finales}
 
 # --- 4. FUNCIONES AUXILIARES DE LIMPIEZA ---
 def limpiar_texto_usuario(texto):
@@ -689,4 +738,11 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
 
     if st.session_state['analisis_terminado_g']:
         st.markdown(st.session_state['html_parametros_g'], unsafe_allow_html=True)
-        st.table(st.session_state['resultados_df_g'])
+        # Aplicamos estilos a la tabla para que el usuario diferencie mejor
+        def highlight_veredicto(val):
+            if "✅" in val: return 'background-color: #dcfce7; color: black; font-weight: bold;'
+            elif "⚠️" in val: return 'background-color: #fef08a; color: black; font-weight: bold;'
+            elif "❌" in val: return 'background-color: #fee2e2; color: black;'
+            return ''
+            
+        st.dataframe(st.session_state['resultados_df_g'].style.map(highlight_veredicto, subset=['Veredicto']))
