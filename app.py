@@ -12,15 +12,12 @@ import time
 import random
 
 # --- 1. CONFIGURACIÓN Y ESTILOS VISUALES ---
-# La barra lateral se inicializa colapsada por defecto
 st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide", initial_sidebar_state="collapsed")
 
-# Pestaña de configuración lateral
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>⚙️ Configuración</h2>", unsafe_allow_html=True)
     st.toggle("🔇 Silenciar Música y Efectos", key="silenciar_sonido", value=False)
 
-# Función para cargar imagen o audio en Base64
 def cargar_archivo_base64(ruta):
     if os.path.exists(ruta):
         with open(ruta, "rb") as archivo:
@@ -82,24 +79,15 @@ st.markdown("""
     .param-box { background-color: #f8f9fa; border: 2px solid #ffc106; padding: 20px; border-radius: 10px; margin-bottom: 25px; color: #000000 !important; }
     .param-box b, .param-box li, .param-box ul { color: #000000 !important; }
 
-    /* --- ESTILOS PARA IMAGEN DE LOGIN (Restaurada y ajustada a absolute) --- */
-    div[data-testid="stTextInput"], div[data-testid="stFormSubmitButton"] { position: relative; z-index: 10; }
+    /* --- ESTILOS PARA IMAGEN DE LOGIN ANCLADA Y FORMULARIO --- */
+    div[data-testid="stTextInput"], .stButton, div[data-testid="stFormSubmitButton"] { position: relative; z-index: 10; }
+    
     div[data-testid="stForm"] { border: none; padding: 0; max-width: 350px; margin: 0; margin-left: 0; background-color: transparent; }
     
-    /* Absolute permite que la imagen se mueva junto con el contenedor principal cuando la sidebar se abre */
-    div[data-testid="stAppViewBlockContainer"] { position: relative; }
-    .login-img-container { 
-        position: absolute; 
-        bottom: 0px; 
-        right: -12%; 
-        height: 80vh; 
-        width: auto; 
-        object-fit: contain; 
-        opacity: 0; 
-        animation: fadeIn 1.2s ease 0.1s forwards; 
-        z-index: 999; 
-        pointer-events: none; 
-    }
+    .login-img-container { position: fixed; bottom: 0px; right: -12%; height: 80vh; width: auto; object-fit: contain; opacity: 0; animation: fadeIn 1.2s ease 0.1s forwards; z-index: 999; pointer-events: none; }
+    
+    /* Estilos para centrar la barra de carga */
+    .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -127,8 +115,6 @@ if 'pagina_actual' not in st.session_state: st.session_state['pagina_actual'] = 
 if 'auth' not in st.session_state: st.session_state['auth'] = False
 if 'uploader_key' not in st.session_state: st.session_state['uploader_key'] = 0
 if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = None
-
-# Variables para controlar que la música inicie solo al interactuar
 if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
 if 'musica_pista' not in st.session_state: st.session_state['musica_pista'] = None
 
@@ -138,7 +124,6 @@ def renderizar_gestor_audio():
     bg_b64 = ""
     sfx_b64 = ""
     
-    # Preparamos las pistas en Base64
     if not silenciado:
         if st.session_state['musica_activa'] and st.session_state['musica_pista']:
             bg_b64 = cargar_archivo_base64(st.session_state['musica_pista'])
@@ -157,7 +142,7 @@ def renderizar_gestor_audio():
             bgAudio = doc.createElement('audio');
             bgAudio.id = 'ecomoda-bg-music';
             bgAudio.loop = true;
-            bgAudio.volume = 0.3; // Volumen suave
+            bgAudio.volume = 0.3;
             doc.body.appendChild(bgAudio);
         }}
         
@@ -192,11 +177,8 @@ def renderizar_gestor_audio():
     </script>
     """
     components.html(js_code, width=0, height=0)
-    
-    # Consumimos el efecto para que no se repita
     st.session_state['sfx_pendiente'] = None
 
-# Renderizar el audio al principio de la carga de la página
 renderizar_gestor_audio()
 
 # --- 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO ---
@@ -234,7 +216,6 @@ def motor_juridico_final(pdf_file):
     
     texto_limpio = re.sub(r'\s+', ' ', texto_acumulado)
     
-    # A. EXTRACCIÓN ACCIONANTE
     accionante = "NO IDENTIFICADO"
     patrones_acc = [
         r"(?:Accionantes?|Demandantes?|Actores?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,150}?)(?=\s*-\s*|\s+Accionado|\s+Demandado|C\.C\.|Cédula|Nit|Expediente|\n)",
@@ -250,7 +231,6 @@ def motor_juridico_final(pdf_file):
                 accionante = cand
                 break
                 
-    # B. EXTRACCIÓN ACCIONADO
     accionado = "NO IDENTIFICADO"
     patrones_ado = [
         r"(?:Accionados?|Demandados?|Entidad accionada|Entidades accionadas)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\(\)_\-\,\.]{3,150}?)(?=\s*-\s*|\s+Magistrado|\s+Tema|\s+Procedencia|Expediente|\n)",
@@ -274,7 +254,6 @@ def motor_juridico_final(pdf_file):
             if not any(b in cand for b in ["PROVIDENCIA", "SENTENCIA", "FALLO", "DECISION", "RESOLUCION", "TUTELA", "DERECHO", "VIDA", "INTEGRIDAD", "SALUD", "PETICION"]):
                 accionado = cand
                 
-    # C. EXTRACCIÓN CALIDAD
     calidad = "NO IDENTIFICADA (CIVIL)"
     poblaciones_lista = ["periodista", "comunicador", "reportero", "líder social", "lideresa social", "defensor de derechos", "defensora de derechos", "abogado", "abogada", "firmante de paz", "indígena", "campesino", "desplazado", "docente"]
     poblaciones_clave = r"(" + "|".join(poblaciones_lista) + r")"
@@ -308,7 +287,6 @@ def motor_juridico_final(pdf_file):
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL", "DEFENSORA DE DERECHOS", "DEFENSOR DE DERECHOS"]: calidad = "LÍDER SOCIAL"
     
-    # D. EXTRACCIÓN DERECHOS VULNERADOS
     derechos_encontrados = set()
     patrones_derecho = [
         r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n|\||T-|Expediente)",
@@ -385,7 +363,6 @@ def motor_juridico_final(pdf_file):
 
     return {"accionante": accionante, "calidad": calidad, "accionado": accionado, "derechos": derechos_finales}
 
-
 # =====================================================================
 # RUTEO DE PANTALLAS ESTRICTO
 # =====================================================================
@@ -409,7 +386,6 @@ if st.session_state['pagina_actual'] == 'bienvenida':
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button(" 🚀  INGRESAR AL SISTEMA"):
-            # SONIDO 1/4 ACTIVADO AQUÍ
             st.session_state['musica_activa'] = True
             st.session_state['musica_pista'] = "INCIDENTAL1_mezcla.mp3"
             st.session_state['sfx_pendiente'] = "Boton1.mp3"
@@ -421,6 +397,8 @@ if st.session_state['pagina_actual'] == 'bienvenida':
             📖  ¿Dudas sobre la línea jurisprudencial? Aquí encontrarás una guía
         </a>
     """, unsafe_allow_html=True)
+    
+    st.stop() # Bloqueo absoluto, nada de esto pasará a la carga
 
 # PANTALLA INTERMEDIA: LÍNEA DE CARGA
 elif st.session_state['pagina_actual'] == 'cargando':
@@ -442,26 +420,29 @@ elif st.session_state['pagina_actual'] == 'cargando':
             
         st.session_state['pagina_actual'] = 'login'
         st.rerun()
+        
+    st.stop()
 
 # PANTALLA 2: FIREWALL DE SEGURIDAD (LOGIN)
 elif st.session_state['pagina_actual'] == 'login':
     st.markdown("<div class='main-title'> 🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
+    
     if img_login_b64:
         st.markdown(f"""
-        <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
-        """, unsafe_allow_html=True)
+            <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
+            """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.info("Por favor, identifícate para acceder al motor de análisis.")
+        
         with st.form(key='login_form', clear_on_submit=False):
             clave = st.text_input("Ingrese la clave de seguridad:", type="password")
             submit_button = st.form_submit_button("INGRESAR")
+            
             if submit_button:
                 if clave == "Juan007":
-                    # SONIDO 2/4 ACTIVADO AQUÍ
                     st.session_state['sfx_pendiente'] = "Boton2.mp3"
-                    # Al pasar de la zona de ingreso al análisis, se cambia la pista
                     st.session_state['musica_pista'] = "INCIDENTAL 2_mezcla.mp3"
                     st.session_state['auth'] = True
                     st.session_state['pagina_actual'] = 'app_garzon'
@@ -469,11 +450,12 @@ elif st.session_state['pagina_actual'] == 'login':
                 else:
                     st.error("Acceso denegado. Clave incorrecta.")
         
-        # Botón de regresar añadido justo DEBAJO del botón ingresar
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔙 Volver a la Bienvenida", use_container_width=True):
+        st.write("") 
+        if st.button("🔙 Volver al inicio"):
             st.session_state['pagina_actual'] = 'bienvenida'
             st.rerun()
+            
+    st.stop()
 
 # PANTALLA 3: GARZÓN (MODO AUTOMÁTICO)
 elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['auth']:
@@ -488,7 +470,7 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
     col_nav1, col_nav2 = st.columns([1, 1])
     with col_nav1:
         if st.button(" 🚪 Cerrar Sesión / Volver a ECOMODA"):
-            st.session_state['musica_activa'] = False # Silencia la música al salir
+            st.session_state['musica_activa'] = False
             st.session_state['auth'] = False
             st.session_state['pagina_actual'] = 'bienvenida'
             st.rerun()
@@ -534,7 +516,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
     with col_btn1:
         ejecutar = st.button(" 🚀 EJECUTAR ANÁLISIS AUTOMÁTICO")
         if ejecutar:
-            # SONIDO 3/4 ACTIVADO AQUÍ
             st.session_state['sfx_pendiente'] = "Boton1.mp3"
             if not file_arq or not files_comp:
                 st.error("Faltan archivos para procesar.")
@@ -648,6 +629,8 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
             file_name="Reporte_Ingenieria_Inversa.pdf",
             mime="application/pdf"
         )
+        
+    st.stop()
 
 # PANTALLA 4: GARZÓN (MODO GUIADO)
 elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state['auth']:
@@ -732,7 +715,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
     with col_btn1_g:
         ejecutar_g = st.button(" 🚀 EJECUTAR ANÁLISIS GUIADO", key="exec_g")
         if ejecutar_g:
-            # SONIDO 4/4 ACTIVADO AQUÍ
             st.session_state['sfx_pendiente'] = "Boton1.mp3"
             if not file_arq_g or not files_comp_g:
                 st.error("Faltan archivos para procesar.")
@@ -905,3 +887,5 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
             file_name="Reporte_Ingenieria_Inversa_Guiado.pdf",
             mime="application/pdf"
         )
+        
+    st.stop()
