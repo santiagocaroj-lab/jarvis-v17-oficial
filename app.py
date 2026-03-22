@@ -227,13 +227,13 @@ def motor_juridico_final(pdf_file):
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL", "DEFENSORA DE DERECHOS", "DEFENSOR DE DERECHOS"]: calidad = "LÍDER SOCIAL"
 
-    # D. EXTRACCIÓN DERECHOS VULNERADOS
+    # D. EXTRACCIÓN DERECHOS VULNERADOS (CORREGIDO)
     derechos_encontrados = []
     patrones_derecho = [
-        r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,\y]{3,200}?)(?:\.|\n|\||T-|Expediente)",
-        r"(?:vulnerar|vulneró|amenazó|violó|transgredió|vulneración|amenaza)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,\y]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
-        r"(?:amparo|protección)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,\y]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
-        r"(?:tutela|amparo)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,\y]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)"
+        r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n|\||T-|Expediente)",
+        r"(?:vulnerar|vulneró|amenazó|violó|transgredió|vulneración|amenaza)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
+        r"(?:amparo|protección)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)",
+        r"(?:tutela|amparo)(?:[^\.]{0,40}?)(?:derechos?\s+fundamentales?|derecho)(?:\s+a\s+la|\s+al|\s+a|\s+de)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n| para | a fin de | contra | solicitando | mediante | por parte)"
     ]
     
     texto_derechos = ""
@@ -656,57 +656,17 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                     resultados.append({
                         "Archivo": f.name,
                         "Aciertos": f"{aciertos}/3",
-                        "Derechos Detectados": ", ".join(info['derechos']),
-                        "Calidad Detectada": info['calidad'],
-                        "Accionado Detectado": info["accionado"],
+                        "Accionante": info['accionante'],
+                        "Calidad Evaluada": info['calidad'],
+                        "Accionado Evaluado": info["accionado"],
+                        "Derechos Evaluados": ", ".join(info['derechos']),
                         "Veredicto": estado,
-                        "Fallas": ", ".join(fallos) if fallos else "Cumple todos los criterios"
+                        "Motivo (Fallas)": ", ".join(fallos) if fallos else "Cumple los 3 criterios"
                     })
                 
                 st.session_state['resultados_df_g'] = pd.DataFrame(resultados)
-                
-                def safe_pdf(txt): return str(txt).encode('latin-1', 'replace').decode('latin-1')
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Arial", 'B', 14)
-                pdf.cell(0, 10, "REPORTE DE INGENIERIA EN REVERSA (GUIADO) - GARZON", 0, 1, 'C')
-                pdf.set_font("Arial", '', 10)
-                pdf.ln(5)
-                pdf.multi_cell(0, 7, safe_pdf(f"REGLA UNICA APLICADA:\nSujeto (Calidad): {final_calidad}\nObjeto (Accionado): {final_accionado_display}\nTema (Derecho): {final_derecho}\n" + "="*50))
-                
-                for r in resultados:
-                    if "INCLUIDA" in r["Veredicto"]:
-                        pdf.set_fill_color(220, 255, 220) # Verde
-                    elif "PRESUNTAMENTE" in r["Veredicto"]:
-                        pdf.set_fill_color(255, 255, 153) # Amarillo
-                    else:
-                        pdf.set_fill_color(255, 220, 220) # Rojo
-                        
-                    pdf.cell(0, 8, safe_pdf(f"Documento: {r['Archivo']} ({r['Aciertos']} Aciertos)"), 1, 1, 'L', True)
-                    pdf.multi_cell(0, 6, safe_pdf(f"Derechos: {r['Derechos Detectados']}\nCalidad: {r['Calidad Detectada']}\nAccionado: {r['Accionado Detectado']}\nVEREDICTO: {r['Veredicto']}\nFallas: {r['Fallas']}\n" + "-"*80))
-                    pdf.ln(2)
-
-                try:
-                    st.session_state['pdf_binario_g'] = pdf.output(dest='S').encode('latin-1')
-                except AttributeError:
-                    st.session_state['pdf_binario_g'] = bytes(pdf.output())
-                    
                 st.session_state['analisis_terminado_g'] = True
 
     if st.session_state['analisis_terminado_g']:
         st.markdown(st.session_state['html_parametros_g'], unsafe_allow_html=True)
-        # Aplicamos estilos a la tabla para que el usuario diferencie mejor
-        def highlight_veredicto(val):
-            if "✅" in val: return 'background-color: #dcfce7; color: black; font-weight: bold;'
-            elif "⚠️" in val: return 'background-color: #fef08a; color: black; font-weight: bold;'
-            elif "❌" in val: return 'background-color: #fee2e2; color: black;'
-            return ''
-            
-        st.dataframe(st.session_state['resultados_df_g'].style.map(highlight_veredicto, subset=['Veredicto']))
-        
-        st.download_button(
-            label="📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
-            data=st.session_state['pdf_binario_g'], 
-            file_name="reporte_guiado_linea_jurisprudencial.pdf",
-            mime="application/pdf"
-        )
+        st.table(st.session_state['resultados_df_g'])
