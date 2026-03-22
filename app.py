@@ -227,7 +227,7 @@ def motor_juridico_final(pdf_file):
     if calidad in ["COMUNICADOR", "REPORTERO"]: calidad = "PERIODISTA"
     if calidad in ["LIDERESA SOCIAL", "DEFENSORA DE DERECHOS", "DEFENSOR DE DERECHOS"]: calidad = "LÍDER SOCIAL"
 
-    # D. EXTRACCIÓN DERECHOS VULNERADOS (CORREGIDO)
+    # D. EXTRACCIÓN DERECHOS VULNERADOS
     derechos_encontrados = []
     patrones_derecho = [
         r"(?:Derechos?\s+vulnerados?|Derechos?\s+invocados?)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s\,]{3,200}?)(?:\.|\n|\||T-|Expediente)",
@@ -244,7 +244,6 @@ def motor_juridico_final(pdf_file):
             break
             
     if texto_derechos:
-        # Limpiar y separar por comas o "y"
         texto_derechos = re.sub(r'\s+y\s+', ',', texto_derechos, flags=re.IGNORECASE)
         texto_derechos = re.sub(r'\s+e\s+', ',', texto_derechos, flags=re.IGNORECASE)
         partes = [d.strip().upper() for d in texto_derechos.split(',') if len(d.strip()) > 3]
@@ -551,11 +550,22 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                 final_accionante = param_u_acc if param_u_acc else ext_base['accionante']
                 final_accionado_display = " | ".join(partes_accionado_u) if partes_accionado_u else ext_base['accionado']
                 
-                # Para el derecho, si el usuario no puso, tomamos el primero que encontró la IA para la regla única (o toda la cadena)
-                if param_u_der:
-                    final_derecho = param_u_der
-                else:
-                    final_derecho = ", ".join(ext_base['derechos']) if ext_base['derechos'] != ["NO IDENTIFICADO"] else "NO DEFINIDO"
+                derechos_base_limpios = [limpiar_texto_usuario(d) for d in ext_base['derechos']]
+                alerta_derecho = ""
+                
+                # Revisar si el derecho del usuario cruzó con la Arquimédica
+                if param_u_der and param_u_der != "NO APLICA":
+                    encontrado = False
+                    for d_base in derechos_base_limpios:
+                        if param_u_der in d_base or d_base in param_u_der:
+                            encontrado = True
+                            break
+                    if not encontrado:
+                        alerta_derecho = f"<div style='margin-top: 15px; padding: 10px; background-color: #ffeeba; border-left: 5px solid #ffc107; color: #856404;'><b>⚠️ ¡Atención!</b> Tu derecho guía ({u_derecho}) no se encontró en la sentencia Arquimédica. Sin embargo, Garzón logró identificar los siguientes y les dará mayor peso: <b>{', '.join(ext_base['derechos'])}</b></div>"
+                
+                final_derecho_display = ", ".join(ext_base['derechos'])
+                if param_u_der and param_u_der != "NO APLICA":
+                     final_derecho_display += f" <br><small>(Guía del usuario: {u_derecho})</small>"
                 
                 # Mostrar en pantalla
                 st.session_state['html_parametros_g'] = f"""
@@ -580,9 +590,10 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                       <tr>
                         <td style="padding: 5px;"><b>3. Derecho (Tema)</b></td>
                         <td style="padding: 5px;">{", ".join(ext_base['derechos'])}</td>
-                        <td style="padding: 5px; color: green;"><b>{final_derecho}</b></td>
+                        <td style="padding: 5px; color: green;"><b>{final_derecho_display}</b></td>
                       </tr>
                     </table>
+                    {alerta_derecho}
                 </div>
                 """
 
@@ -625,21 +636,30 @@ if st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_state
                     else:
                         fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
                         
-                    # --- CHECK 3: DERECHO ---
-                    derecho_limpio_final = limpiar_texto_usuario(final_derecho)
+                    # --- CHECK 3: DERECHO (PRESUNCIÓN DE RELEVANCIA) ---
                     derechos_info_limpios = [limpiar_texto_usuario(d) for d in info['derechos']]
                     coincidencia_derecho = False
                     
-                    if derecho_limpio_final == "NO DEFINIDO" or derecho_limpio_final == "":
-                        # Si no hay regla exigida, le damos el acierto gratis o lo ignoramos. Se lo damos para no penalizar.
+                    if ext_base['derechos'] == ["NO IDENTIFICADO"] and (not param_u_der or param_u_der == "NO APLICA"):
                         aciertos += 1
                         coincidencia_derecho = True
                     else:
-                        for d_info in derechos_info_limpios:
-                            if derecho_limpio_final in d_info or d_info in derecho_limpio_final:
-                                coincidencia_derecho = True
-                                break
+                        # 1. Presunción de relevancia: buscar al menos 1 derecho de la arquimédica en la comparada
+                        for d_base in derechos_base_limpios:
+                            if d_base == "NO IDENTIFICADO": continue
+                            for d_info in derechos_info_limpios:
+                                if d_base in d_info or d_info in d_base:
+                                    coincidencia_derecho = True
+                                    break
+                            if coincidencia_derecho: break
                         
+                        # 2. Si no cruzó la base, pero el usuario dio un parámetro guía y ESE cruza, lo valemos
+                        if not coincidencia_derecho and param_u_der and param_u_der != "NO APLICA":
+                            for d_info in derechos_info_limpios:
+                                if param_u_der in d_info or d_info in param_u_der:
+                                    coincidencia_derecho = True
+                                    break
+
                         if coincidencia_derecho:
                             aciertos += 1
                         else:
