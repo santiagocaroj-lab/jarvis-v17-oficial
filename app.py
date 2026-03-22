@@ -398,7 +398,7 @@ if st.session_state['pagina_actual'] == 'login':
     st.markdown("<div class='main-title'>🔒 ACCESO RESTRINGIDO GARZÓN</div>", unsafe_allow_html=True)
     
     # --- IMAGEN ANCLADA Y EN CAPA SUPERIOR ---
-    nombre_imagen_login = "IMAGEN (3).png"
+    nombre_imagen_login = "IMAGEN 4.png"
     if os.path.exists(nombre_imagen_login):
         with open(nombre_imagen_login, "rb") as image_file:
             encoded_login = base64.b64encode(image_file.read()).decode()
