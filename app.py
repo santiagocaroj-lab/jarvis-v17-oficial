@@ -14,6 +14,7 @@ import random
 # ==========================================
 # 1. CONFIGURACIÓN Y ESTILOS VISUALES
 # ==========================================
+# Aquí forzamos que el menú lateral inicie colapsado (cerrado)
 st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide", initial_sidebar_state="collapsed")
 
 with st.sidebar:
@@ -90,7 +91,7 @@ st.markdown("""
     .login-img-container { 
         position: fixed; 
         bottom: 0px; 
-        right: -12%; 
+        right: -25%; /* Inicialmente más escondida a la derecha */
         height: 80vh; 
         width: auto; 
         object-fit: contain; 
@@ -132,7 +133,7 @@ if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = 
 if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
 if 'musica_pista' not in st.session_state: st.session_state['musica_pista'] = None
 
-# --- SISTEMA DE BARAJEADO PERFECTO DE FRASES (No repetición) ---
+# --- SISTEMA DE BARAJEADO PERFECTO DE FRASES ---
 if 'frases_disponibles' not in st.session_state or not st.session_state['frases_disponibles']:
     todas_las_frases = [
         "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", 
@@ -214,12 +215,12 @@ def renderizar_gestor_y_efectos():
                 
                 const updatePos = () => {{
                     const rect = mainContainer.getBoundingClientRect();
-                    // FIX PRINCIPAL: Usar el ancho de la pantalla completa (parent), no el del iframe oculto (0 px)
                     const windowWidth = window.parent.innerWidth;
                     const spaceOnRight = windowWidth - rect.right;
                     
-                    let finalRight = spaceOnRight - 80;
-                    if (finalRight < -150) finalRight = -150; // Seguridad extra
+                    // Empujamos la imagen MUCHO más a la derecha (250px extra)
+                    let finalRight = spaceOnRight - 250;
+                    if (finalRight < -400) finalRight = -400; // Límite de seguridad
                     
                     img.style.right = finalRight + 'px'; 
                 }};
