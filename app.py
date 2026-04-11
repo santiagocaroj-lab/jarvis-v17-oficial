@@ -1,6 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import fitz  # PyMuPDF
+import fitz  # Esta es la librería PyMuPDF (asegúrate de hacer: pip install PyMuPDF)
 import re
 from fpdf import FPDF
 import pandas as pd
@@ -14,7 +14,6 @@ import random
 # ==========================================
 # 1. CONFIGURACIÓN Y ESTILOS VISUALES
 # ==========================================
-# Aquí forzamos que el menú lateral inicie colapsado (cerrado)
 st.set_page_config(page_title="ECOMODA - Servidor Jurídico", layout="wide", initial_sidebar_state="collapsed")
 
 with st.sidebar:
@@ -91,7 +90,7 @@ st.markdown("""
     .login-img-container { 
         position: fixed; 
         bottom: 0px; 
-        right: -25%; /* Inicialmente más escondida a la derecha */
+        right: -12%; 
         height: 80vh; 
         width: auto; 
         object-fit: contain; 
@@ -133,7 +132,7 @@ if 'sfx_pendiente' not in st.session_state: st.session_state['sfx_pendiente'] = 
 if 'musica_activa' not in st.session_state: st.session_state['musica_activa'] = False
 if 'musica_pista' not in st.session_state: st.session_state['musica_pista'] = None
 
-# --- SISTEMA DE BARAJEADO PERFECTO DE FRASES ---
+# --- SISTEMA DE BARAJEADO PERFECTO DE FRASES (No repetición) ---
 if 'frases_disponibles' not in st.session_state or not st.session_state['frases_disponibles']:
     todas_las_frases = [
         "Buscando en la relatoría de la corte...", "Leyendo sobre el realismo jurídico...", 
@@ -215,14 +214,9 @@ def renderizar_gestor_y_efectos():
                 
                 const updatePos = () => {{
                     const rect = mainContainer.getBoundingClientRect();
-                    const windowWidth = window.parent.innerWidth;
+                    const windowWidth = window.innerWidth;
                     const spaceOnRight = windowWidth - rect.right;
-                    
-                    // Empujamos la imagen MUCHO más a la derecha (250px extra)
-                    let finalRight = spaceOnRight - 250;
-                    if (finalRight < -400) finalRight = -400; // Límite de seguridad
-                    
-                    img.style.right = finalRight + 'px'; 
+                    img.style.right = (spaceOnRight - 80) + 'px'; 
                 }};
                 
                 const observer = new ResizeObserver(updatePos);
@@ -244,7 +238,7 @@ def renderizar_gestor_y_efectos():
 renderizar_gestor_y_efectos()
 
 # ==========================================
-# 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO
+# 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO (ACTUALIZADO A PYMUPDF/FITZ)
 # ==========================================
 def limpiar_texto_usuario(texto):
     if not texto: return ""
@@ -273,12 +267,19 @@ def motor_juridico_final(pdf_file):
     texto_acumulado = ""
     try:
         pdf_file.seek(0)
+        # ---------------------------------------------------------
+        # AQUÍ ESTÁ EL CAMBIO A LA NUEVA LIBRERÍA (PyMuPDF / fitz)
+        # ---------------------------------------------------------
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+        
+        # Leemos hasta 20 páginas
         limite_paginas = min(20, doc.page_count)
         
         for i in range(limite_paginas):
             pagina_texto = doc[i].get_text("text")
             texto_acumulado += pagina_texto + " \n "
+            
+            # Condición de parada inteligente para ahorrar recursos
             if re.search(r"Magistrad[oa]\s+Ponente", pagina_texto, re.IGNORECASE):
                 break
                 
@@ -937,6 +938,7 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                                 match_derecho = True
                                 break
                     else:
+                        # Fallback a la Sentencia Base
                         if ext_base['derechos'] == ["NO IDENTIFICADO"]:
                             match_derecho = True
                         else:
