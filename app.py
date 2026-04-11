@@ -1,6 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import PyPDF2
+import fitz  # Esta es la librería PyMuPDF (asegúrate de hacer: pip install PyMuPDF)
 import re
 from fpdf import FPDF
 import pandas as pd
@@ -90,7 +90,7 @@ st.markdown("""
     .login-img-container { 
         position: fixed; 
         bottom: 0px; 
-        right: -12%; /* Se sobrescribe por JS */
+        right: -12%; 
         height: 80vh; 
         width: auto; 
         object-fit: contain; 
@@ -238,7 +238,7 @@ def renderizar_gestor_y_efectos():
 renderizar_gestor_y_efectos()
 
 # ==========================================
-# 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO
+# 4. FUNCIONES AUXILIARES Y MOTOR JURÍDICO (ACTUALIZADO A PYMUPDF/FITZ)
 # ==========================================
 def limpiar_texto_usuario(texto):
     if not texto: return ""
@@ -267,9 +267,23 @@ def motor_juridico_final(pdf_file):
     texto_acumulado = ""
     try:
         pdf_file.seek(0)
-        reader = PyPDF2.PdfReader(pdf_file)
-        for i in range(min(12, len(reader.pages))):
-            texto_acumulado += reader.pages[i].extract_text() + " \n "
+        # ---------------------------------------------------------
+        # AQUÍ ESTÁ EL CAMBIO A LA NUEVA LIBRERÍA (PyMuPDF / fitz)
+        # ---------------------------------------------------------
+        doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+        
+        # Leemos hasta 20 páginas
+        limite_paginas = min(20, doc.page_count)
+        
+        for i in range(limite_paginas):
+            pagina_texto = doc[i].get_text("text")
+            texto_acumulado += pagina_texto + " \n "
+            
+            # Condición de parada inteligente para ahorrar recursos
+            if re.search(r"Magistrad[oa]\s+Ponente", pagina_texto, re.IGNORECASE):
+                break
+                
+        doc.close()
     except Exception as e:
         return {"accionante": "ERROR_LECTURA", "calidad": "ERROR", "accionado": "ERROR_LECTURA", "derechos": ["ERROR"]}
     
@@ -469,7 +483,6 @@ elif st.session_state['pagina_actual'] == 'cargando':
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-        # Extraemos una frase aleatoria que NO se repite
         mensaje_actual = st.session_state['frases_disponibles'].pop()
         
         st.markdown(f"<h4 style='text-align: center; color: #1a1a1a;'>{mensaje_actual}</h4>", unsafe_allow_html=True)
@@ -681,7 +694,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
 
     if st.session_state['analisis_terminado']:
         st.markdown(st.session_state['html_parametros'], unsafe_allow_html=True)
-        # ACÁ ESTÁ LA CORRECCIÓN DE LA LIBRERÍA PANDAS (.map en vez de .applymap)
         st.dataframe(st.session_state['resultados_df'].style.map(highlight_veredicto, subset=['Veredicto']))
         st.download_button(
             label=" 📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
@@ -888,39 +900,31 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
                     
                     # 2. MATCH ACCIONADO
                     match_accionado = False
-                    acc_comp_lista = limpiar_y_separar_sujetos(info["accionado"])
+                    acc_comp = limpiar_texto_usuario(info["accionado"])
+                    siglas_comp = generar_siglas(acc_comp)
                     
                     if usar_accionado_usuario:
                         for parte in partes_accionado_u:
                             parte_limpia = limpiar_texto_usuario(parte)
                             if len(parte_limpia) > 2:
                                 sigla_parte = generar_siglas(parte_limpia)
-                                for a_comp in acc_comp_lista:
-                                    siglas_comp = generar_siglas(a_comp)
-                                    if parte_limpia in a_comp or a_comp in parte_limpia or \
-                                       (len(sigla_parte) >= 2 and sigla_parte in a_comp) or \
-                                       (len(siglas_comp) >= 2 and siglas_comp in parte_limpia):
-                                        match_accionado = True
-                                        break
-                            if match_accionado: break
+                                if parte_limpia in acc_comp or acc_comp in parte_limpia or \
+                                   (len(sigla_parte) >= 2 and sigla_parte in acc_comp) or \
+                                   (len(siglas_comp) >= 2 and siglas_comp in parte_limpia):
+                                    match_accionado = True
+                                    break
                     else:
-                        # Fallback a la Sentencia Base
-                        if ext_base['accionado'] == "NO IDENTIFICADO":
+                        acc_base = limpiar_texto_usuario(ext_base['accionado'])
+                        if acc_base == "NO IDENTIFICADO":
                             match_accionado = True
                         else:
-                            acc_base_lista = limpiar_y_separar_sujetos(ext_base['accionado'])
-                            for a_base in acc_base_lista:
-                                for a_comp in acc_comp_lista:
-                                    siglas_base = generar_siglas(a_base)
-                                    siglas_comp = generar_siglas(a_comp)
-                                    if (len(a_base) > 2 and len(a_comp) > 2 and (a_base in a_comp or a_comp in a_base)) or \
-                                       (len(siglas_base) >= 2 and siglas_base in a_comp) or \
-                                       (len(siglas_comp) >= 2 and siglas_comp in a_base) or \
-                                       (len(siglas_base) >= 2 and siglas_base == siglas_comp):
-                                        match_accionado = True
-                                        break
-                                if match_accionado: break
-                            
+                            siglas_base = generar_siglas(acc_base)
+                            if (len(acc_base) > 2 and len(acc_comp) > 2 and (acc_base in acc_comp or acc_comp in acc_base)) or \
+                               (len(siglas_base) >= 2 and siglas_base in acc_comp) or \
+                               (len(siglas_comp) >= 2 and siglas_comp in acc_base) or \
+                               (len(siglas_base) >= 2 and siglas_base == siglas_comp):
+                                match_accionado = True
+                                
                     if not match_accionado:
                         fallos.append(f"Accionado difiere ({info['accionado'][:20]}...)")
                         
@@ -996,7 +1000,6 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
 
     if st.session_state['analisis_terminado_g']:
         st.markdown(st.session_state['html_parametros_g'], unsafe_allow_html=True)
-        # ACÁ TAMBIÉN ESTÁ LA CORRECCIÓN DE LA LIBRERÍA PANDAS (.map en vez de .applymap)
         st.dataframe(st.session_state['resultados_df_g'].style.map(highlight_veredicto, subset=['Veredicto']))
         
         st.download_button(
