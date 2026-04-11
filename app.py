@@ -681,7 +681,8 @@ elif st.session_state['pagina_actual'] == 'app_garzon' and st.session_state['aut
 
     if st.session_state['analisis_terminado']:
         st.markdown(st.session_state['html_parametros'], unsafe_allow_html=True)
-        st.dataframe(st.session_state['resultados_df'].style.applymap(highlight_veredicto, subset=['Veredicto']))
+        # ACÁ ESTÁ LA CORRECCIÓN DE LA LIBRERÍA PANDAS (.map en vez de .applymap)
+        st.dataframe(st.session_state['resultados_df'].style.map(highlight_veredicto, subset=['Veredicto']))
         st.download_button(
             label=" 📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
             data=st.session_state['pdf_binario'], 
@@ -995,7 +996,8 @@ elif st.session_state['pagina_actual'] == 'app_garzon_guiado' and st.session_sta
 
     if st.session_state['analisis_terminado_g']:
         st.markdown(st.session_state['html_parametros_g'], unsafe_allow_html=True)
-        st.dataframe(st.session_state['resultados_df_g'].style.applymap(highlight_veredicto, subset=['Veredicto']))
+        # ACÁ TAMBIÉN ESTÁ LA CORRECCIÓN DE LA LIBRERÍA PANDAS (.map en vez de .applymap)
+        st.dataframe(st.session_state['resultados_df_g'].style.map(highlight_veredicto, subset=['Veredicto']))
         
         st.download_button(
             label=" 📥 DESCARGAR REPORTE TÉCNICO EN PDF", 
