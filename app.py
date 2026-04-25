@@ -93,16 +93,17 @@ st.markdown("""
         position: fixed; 
         bottom: 0px; 
         right: -10%; 
-        height: 90vh; /* Se agrandó la imagen */
+        /* Estado inicial GRANDE */
+        height: 90vh; 
         width: auto; 
-        max-width: 60vw; /* Permite que se vea el ancho de la nueva imagen */
+        max-width: 60vw; 
         object-fit: contain; 
         object-position: bottom right; /* Anclada firmemente a la parte inferior derecha */
         opacity: 0; 
         animation: fadeIn 1.2s ease 0.1s forwards; 
         z-index: 999; 
         pointer-events: none; 
-        transition: right 0.3s ease-out; 
+        transition: right 0.3s ease-out; /* Transiciones suaves para JS */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -208,33 +209,51 @@ def renderizar_gestor_y_efectos():
             sfxAudio.play().catch(e => console.log("Autoplay SFX bloqueado"));
         }}
 
-        // 2. DESPLAZAMIENTO DINÁMICO DE LA IMAGEN
-        const checkImg = setInterval(() => {{
+        // 2. DESPLAZAMIENTO DINÁMICO Y ANIMACIÓN DE TAMAÑO DE LA IMAGEN
+        // Usamos setInterval para asegurar que Streamlit haya renderizado todo
+        const checkElements = setInterval(() => {{
             const img = doc.querySelector('.login-img-container');
             const mainContainer = doc.querySelector('[data-testid="stAppViewBlockContainer"]') || doc.querySelector('.block-container');
+            // Buscamos el bloque de info/input para medirlo
+            const loginForm = doc.querySelector('div[data-testid="stForm"]');
             
-            if (img && mainContainer) {{
-                clearInterval(checkImg);
+            if (img && mainContainer && loginForm) {{
+                clearInterval(checkElements);
                 
-                const updatePos = () => {{
-                    const rect = mainContainer.getBoundingClientRect();
+                const animateAndPosition = () => {{
                     const windowWidth = window.parent.innerWidth;
-                    const spaceOnRight = windowWidth - rect.right;
-                    
-                    // Ajuste para permitir que la imagen horizontal entre más en pantalla
+                    const containerRect = mainContainer.getBoundingClientRect();
+                    const formRect = loginForm.getBoundingClientRect();
+                    const viewPortHeight = window.parent.innerHeight;
+
+                    // A. Posicionamiento Right (Ajuste para horizontal)
+                    const spaceOnRight = windowWidth - containerRect.right;
                     let finalRight = spaceOnRight - 100;
-                    if (finalRight < -250) finalRight = -250; // Límite de seguridad ajustado
-                    
+                    if (finalRight < -250) finalRight = -250;
                     img.style.right = finalRight + 'px'; 
+                    
+                    // B. Animación de encogimiento (relativamente rápido)
+                    // Calculamos la altura final: Altura total - posición top del formulario + un offset para "cabeza por encima"
+                    // formRect.top es la distancia desde el top del viewport hasta el formulario.
+                    const finalHeight = Math.max((viewPortHeight - formRect.top) + 80, viewPortHeight * 0.3);
+                    
+                    // Aplicamos el cambio con transición suave (0.5s definida en CSS)
+                    img.style.transition = 'height 0.5s ease-out, right 0.3s ease-out, opacity 1.2s ease';
+                    img.style.height = finalHeight + 'px';
                 }};
                 
-                const observer = new ResizeObserver(updatePos);
+                const observer = new ResizeObserver(animateAndPosition);
                 observer.observe(mainContainer);
-                updatePos(); 
+                // También observamos el viewport por si cambia de tamaño
+                window.parent.addEventListener('resize', animateAndPosition);
+                
+                // Ejecutamos inicial (estado GRANDE predefinido en CSS)
+                // y disparamos el encogimiento rápido
+                setTimeout(animateAndPosition, 500); // Pequeño delay para que se vea el estado grande
             }}
-        }}, 200);
+        }}, 100);
         
-        setTimeout(() => clearInterval(checkImg), 4000);
+        setTimeout(() => clearInterval(checkElements), 5000);
 
     }} catch (error) {{
         console.log("Error de JS:", error);
@@ -427,7 +446,7 @@ def motor_juridico_final(pdf_file):
                         encontrado = True
                         break
 
-                if not encontrado and len(d_clean) < 30:
+                if not parado and len(d_clean) < 30:
                     derechos_encontrados.add(d_clean)
                     
     if not derechos_encontrados:
