@@ -28,7 +28,8 @@ def cargar_archivo_base64(ruta):
     return ""
 
 img_logo_b64 = cargar_archivo_base64("Gemini_Generated_Image_ycjj93ycjj93ycjj (1).png")
-img_login_b64 = cargar_archivo_base64("IMAGEN 4.png")
+# CAMBIO DE IMAGEN: Se actualizó el nombre a CONTRASEÑA.png
+img_login_b64 = cargar_archivo_base64("CONTRASEÑA.png")
 
 st.markdown("""
     <style>
@@ -91,10 +92,12 @@ st.markdown("""
     .login-img-container { 
         position: fixed; 
         bottom: 0px; 
-        right: -25%; /* Inicialmente más escondida a la derecha */
-        height: 80vh; 
+        right: -10%; 
+        height: 90vh; /* Se agrandó la imagen */
         width: auto; 
+        max-width: 60vw; /* Permite que se vea el ancho de la nueva imagen */
         object-fit: contain; 
+        object-position: bottom right; /* Anclada firmemente a la parte inferior derecha */
         opacity: 0; 
         animation: fadeIn 1.2s ease 0.1s forwards; 
         z-index: 999; 
@@ -218,9 +221,9 @@ def renderizar_gestor_y_efectos():
                     const windowWidth = window.parent.innerWidth;
                     const spaceOnRight = windowWidth - rect.right;
                     
-                    // Empujamos la imagen MUCHO más a la derecha (250px extra)
-                    let finalRight = spaceOnRight - 250;
-                    if (finalRight < -400) finalRight = -400; // Límite de seguridad
+                    // Ajuste para permitir que la imagen horizontal entre más en pantalla
+                    let finalRight = spaceOnRight - 100;
+                    if (finalRight < -250) finalRight = -250; // Límite de seguridad ajustado
                     
                     img.style.right = finalRight + 'px'; 
                 }};
@@ -505,7 +508,8 @@ elif st.session_state['pagina_actual'] == 'login':
             <img src="data:image/png;base64,{img_login_b64}" class="login-img-container">
             """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # REORGANIZACIÓN: Formulario movido más a la izquierda para dejar la derecha a la imagen
+    col1, col2, col3 = st.columns([1, 2, 2.5])
     with col2:
         st.info("Por favor, identifícate para acceder al motor de análisis.")
         
